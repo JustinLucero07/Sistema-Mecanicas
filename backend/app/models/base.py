@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -14,19 +14,38 @@ class TimestampMixin:
     )
 
 
+class TenantMixin:
+    organizacion_id: Mapped[int] = mapped_column(ForeignKey("organizaciones.id"), index=True, nullable=False)
+
+
 class RolUsuario(str, enum.Enum):
-    ADMIN = "admin"
+    SUPERADMIN = "superadmin"
+    ADMIN_TALLER = "admin_taller"
+    GERENTE = "gerente"
+    RECEPCIONISTA = "recepcionista"
     MECANICO = "mecanico"
-    CAJERO = "cajero"
+    INVENTARIO = "inventario"
+    CONTABILIDAD = "contabilidad"
     CLIENTE = "cliente"
+    # Retrocompatibilidad
+    ADMIN = "admin"
+    CAJERO = "cajero"
 
 
 class EstadoOrden(str, enum.Enum):
+    RECEPCION = "recepcion"
+    DIAGNOSTICO = "diagnostico"
+    ESPERANDO_APROBACION = "esperando_aprobacion"
+    ESPERANDO_REPUESTOS = "esperando_repuestos"
+    EN_REPARACION = "en_reparacion"
+    CONTROL_CALIDAD = "control_calidad"
+    LISTO_PARA_ENTREGAR = "listo_para_entregar"
+    ENTREGADO = "entregado"
+    CANCELADO = "cancelado"
+    # Retrocompatibilidad
     PENDIENTE = "pendiente"
     EN_PROCESO = "en_proceso"
     COMPLETADO = "completado"
-    ENTREGADO = "entregado"
-    CANCELADO = "cancelado"
 
 
 class PrioridadOrden(str, enum.Enum):
@@ -39,12 +58,45 @@ class PrioridadOrden(str, enum.Enum):
 class TipoDetalleOrden(str, enum.Enum):
     MANO_OBRA = "mano_obra"
     REPUESTO = "repuesto"
+    SERVICIO_EXTERNO = "servicio_externo"
+
+
+class EstadoInspeccionItem(str, enum.Enum):
+    BUENO = "bueno"
+    REVISAR = "revisar"
+    DEFICIENTE = "deficiente"
+    REQUIERE_REPARACION = "requiere_reparacion"
+
+
+class EstadoCita(str, enum.Enum):
+    PROGRAMADA = "programada"
+    CONFIRMADA = "confirmada"
+    COMPLETADA = "completada"
+    CANCELADA = "cancelada"
+    NO_ASISTIO = "no_asistio"
+
+
+class EstadoBahia(str, enum.Enum):
+    DISPONIBLE = "disponible"
+    OCUPADA = "ocupada"
+    MANTENIMIENTO = "mantenimiento"
+    RESERVADA = "reservada"
+
+
+class EstadoCotizacion(str, enum.Enum):
+    BORRADOR = "borrador"
+    ENVIADA = "enviada"
+    VISTA = "vista"
+    APROBADA = "aprobada"
+    RECHAZADA = "rechazada"
+    VENCIDA = "vencida"
 
 
 class TipoMovimientoInventario(str, enum.Enum):
     ENTRADA = "entrada"
     SALIDA = "salida"
     AJUSTE = "ajuste"
+    DEVOLUCION = "devolucion"
 
 
 class MotivoMovimientoInventario(str, enum.Enum):
@@ -58,6 +110,7 @@ class MetodoPago(str, enum.Enum):
     EFECTIVO = "efectivo"
     TARJETA = "tarjeta"
     TRANSFERENCIA = "transferencia"
+    CHEQUE = "cheque"
     OTRO = "otro"
 
 
@@ -82,9 +135,25 @@ class EstadoCuenta(str, enum.Enum):
 
 class TipoFoto(str, enum.Enum):
     PLACA = "placa"
+    FRENTE = "frente"
+    PARTE_TRASERA = "parte_trasera"
+    LATERAL_IZQUIERDO = "lateral_izquierdo"
+    LATERAL_DERECHO = "lateral_derecho"
+    INTERIOR = "interior"
+    MOTOR = "motor"
+    DANIO = "danio"
     ANTES = "antes"
     DESPUES = "despues"
     COMPROBANTE = "comprobante"
+
+
+class TipoDocumento(str, enum.Enum):
+    MATRICULA = "matricula"
+    SEGURO = "seguro"
+    MANUAL = "manual"
+    PERITAJE = "peritaje"
+    FACTURA = "factura"
+    OTRO = "otro"
 
 
 class EstadoComision(str, enum.Enum):

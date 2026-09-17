@@ -14,11 +14,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
 
     await tester.pumpWidget(
-      ChangeNotifierProvider(create: (_) => AuthService(), child: const TallerMecanicaApp()),
+      ChangeNotifierProvider(create: (_) => AuthService(), child: const MecanicaOSApp()),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Taller Mecánica'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Ingresar'), findsOneWidget);
+    expect(find.text('MecánicaOS Pro'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Ingresar al Taller'), findsOneWidget);
   });
 }

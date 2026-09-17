@@ -3,9 +3,9 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_finanzas, require_staff
+from app.core.deps import get_current_tenant_id, get_current_user, require_finanzas, require_staff
 from app.database import get_db
-from app.models.base import EstadoCuenta
+from app.models.base import EstadoCuenta, MetodoPago
 from app.models.financiero import CajaDiaria, CuentaPorCobrar, CuentaPorPagar, Egreso, Ingreso
 from app.models.usuario import Usuario
 from app.schemas.financiero import (
@@ -30,9 +30,12 @@ router = APIRouter(prefix="/api/financiero", tags=["financiero"], dependencies=[
 # ---------------------------------------------------------------- Ingresos
 @router.get("/ingresos", response_model=list[IngresoOut])
 def listar_ingresos(
-    desde: date | None = None, hasta: date | None = None, db: Session = Depends(get_db)
+    desde: date | None = None,
+    hasta: date | None = None,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
 ) -> list[Ingreso]:
-    query = db.query(Ingreso)
+    query = db.query(Ingreso).filter(Ingreso.organizacion_id == org_id)
     if desde:
         query = query.filter(Ingreso.fecha >= desde)
     if hasta:
@@ -42,9 +45,16 @@ def listar_ingresos(
 
 @router.post("/ingresos", response_model=IngresoOut, status_code=201)
 def registrar_ingreso(
-    payload: IngresoCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(require_staff)
+    payload: IngresoCreate,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Ingreso:
-    ingreso = Ingreso(**payload.model_dump(), usuario_registro_id=usuario.id)
+    ingreso = Ingreso(
+        organizacion_id=org_id,
+        usuario_registro_id=usuario.id,
+        **payload.model_dump(),
+    )
     db.add(ingreso)
     db.commit()
     db.refresh(ingreso)
@@ -54,9 +64,12 @@ def registrar_ingreso(
 # ----------------------------------------------------------------- Egresos
 @router.get("/egresos", response_model=list[EgresoOut])
 def listar_egresos(
-    desde: date | None = None, hasta: date | None = None, db: Session = Depends(get_db)
+    desde: date | None = None,
+    hasta: date | None = None,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
 ) -> list[Egreso]:
-    query = db.query(Egreso)
+    query = db.query(Egreso).filter(Egreso.organizacion_id == org_id)
     if desde:
         query = query.filter(Egreso.fecha >= desde)
     if hasta:
@@ -66,9 +79,16 @@ def listar_egresos(
 
 @router.post("/egresos", response_model=EgresoOut, status_code=201)
 def registrar_egreso(
-    payload: EgresoCreate, db: Session = Depends(get_db), usuario: Usuario = Depends(require_staff)
+    payload: EgresoCreate,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Egreso:
-    egreso = Egreso(**payload.model_dump(), usuario_registro_id=usuario.id)
+    egreso = Egreso(
+        organizacion_id=org_id,
+        usuario_registro_id=usuario.id,
+        **payload.model_dump(),
+    )
     db.add(egreso)
     db.commit()
     db.refresh(egreso)
@@ -76,13 +96,25 @@ def registrar_egreso(
 
 
 # ------------------------------------------------------------- Caja diaria
-def _calcular_esperado_caja(db: Session, fecha: date, monto_apertura: float) -> float:
+def _calcular_esperado_caja(db: Session, org_id: int, fecha: date, monto_apertura: float) -> float:
     siguiente_dia = fecha + timedelta(days=1)
     ingresos_dia = (
-        db.query(Ingreso.monto).filter(Ingreso.fecha >= fecha, Ingreso.fecha < siguiente_dia).all()
+        db.query(Ingreso.monto)
+        .filter(
+            Ingreso.organizacion_id == org_id,
+            Ingreso.fecha >= fecha,
+            Ingreso.fecha < siguiente_dia,
+        )
+        .all()
     )
     egresos_dia = (
-        db.query(Egreso.monto).filter(Egreso.fecha >= fecha, Egreso.fecha < siguiente_dia).all()
+        db.query(Egreso.monto)
+        .filter(
+            Egreso.organizacion_id == org_id,
+            Egreso.fecha >= fecha,
+            Egreso.fecha < siguiente_dia,
+        )
+        .all()
     )
     total_ingresos = sum(float(m[0]) for m in ingresos_dia)
     total_egresos = sum(float(m[0]) for m in egresos_dia)
@@ -90,19 +122,39 @@ def _calcular_esperado_caja(db: Session, fecha: date, monto_apertura: float) -> 
 
 
 @router.get("/caja/hoy", response_model=CajaDiariaOut | None)
-def obtener_caja_hoy(db: Session = Depends(get_db)) -> CajaDiaria | None:
-    return db.query(CajaDiaria).filter(CajaDiaria.fecha == date.today()).first()
+def obtener_caja_hoy(
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> CajaDiaria | None:
+    return (
+        db.query(CajaDiaria)
+        .filter(CajaDiaria.organizacion_id == org_id, CajaDiaria.fecha == date.today())
+        .first()
+    )
 
 
 @router.post("/caja/abrir", response_model=CajaDiariaOut, status_code=201)
 def abrir_caja(
-    payload: AperturaCajaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(require_staff)
+    payload: AperturaCajaRequest,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> CajaDiaria:
     hoy = date.today()
-    if db.query(CajaDiaria).filter(CajaDiaria.fecha == hoy).first():
+    caja_existente = (
+        db.query(CajaDiaria)
+        .filter(CajaDiaria.organizacion_id == org_id, CajaDiaria.fecha == hoy)
+        .first()
+    )
+    if caja_existente:
         raise HTTPException(status_code=400, detail="La caja de hoy ya fue abierta")
 
-    caja = CajaDiaria(fecha=hoy, monto_apertura=payload.monto_apertura, usuario_apertura_id=usuario.id)
+    caja = CajaDiaria(
+        organizacion_id=org_id,
+        fecha=hoy,
+        monto_apertura=payload.monto_apertura,
+        usuario_apertura_id=usuario.id,
+    )
     db.add(caja)
     db.commit()
     db.refresh(caja)
@@ -111,16 +163,23 @@ def abrir_caja(
 
 @router.post("/caja/cerrar", response_model=CajaDiariaOut)
 def cerrar_caja(
-    payload: CierreCajaRequest, db: Session = Depends(get_db), usuario: Usuario = Depends(require_staff)
+    payload: CierreCajaRequest,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> CajaDiaria:
     hoy = date.today()
-    caja = db.query(CajaDiaria).filter(CajaDiaria.fecha == hoy).first()
+    caja = (
+        db.query(CajaDiaria)
+        .filter(CajaDiaria.organizacion_id == org_id, CajaDiaria.fecha == hoy)
+        .first()
+    )
     if not caja:
         raise HTTPException(status_code=404, detail="No se ha abierto la caja de hoy")
     if caja.cerrada:
         raise HTTPException(status_code=400, detail="La caja de hoy ya está cerrada")
 
-    esperado = _calcular_esperado_caja(db, hoy, float(caja.monto_apertura))
+    esperado = _calcular_esperado_caja(db, org_id, hoy, float(caja.monto_apertura))
     caja.monto_cierre_esperado = esperado
     caja.monto_cierre_real = payload.monto_cierre_real
     caja.diferencia = payload.monto_cierre_real - esperado
@@ -134,8 +193,13 @@ def cerrar_caja(
 
 
 @router.get("/caja/historial", response_model=list[CajaDiariaOut])
-def historial_caja(desde: date | None = None, hasta: date | None = None, db: Session = Depends(get_db)) -> list[CajaDiaria]:
-    query = db.query(CajaDiaria)
+def historial_caja(
+    desde: date | None = None,
+    hasta: date | None = None,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> list[CajaDiaria]:
+    query = db.query(CajaDiaria).filter(CajaDiaria.organizacion_id == org_id)
     if desde:
         query = query.filter(CajaDiaria.fecha >= desde)
     if hasta:
@@ -145,16 +209,24 @@ def historial_caja(desde: date | None = None, hasta: date | None = None, db: Ses
 
 # ------------------------------------------------------- Cuentas por cobrar
 @router.get("/cuentas-por-cobrar", response_model=list[CuentaPorCobrarOut])
-def listar_cuentas_por_cobrar(estado: EstadoCuenta | None = None, db: Session = Depends(get_db)) -> list[CuentaPorCobrar]:
-    query = db.query(CuentaPorCobrar)
+def listar_cuentas_por_cobrar(
+    estado: EstadoCuenta | None = None,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> list[CuentaPorCobrar]:
+    query = db.query(CuentaPorCobrar).filter(CuentaPorCobrar.organizacion_id == org_id)
     if estado:
         query = query.filter(CuentaPorCobrar.estado == estado)
     return query.order_by(CuentaPorCobrar.fecha_vencimiento).all()
 
 
 @router.post("/cuentas-por-cobrar", response_model=CuentaPorCobrarOut, status_code=201)
-def crear_cuenta_por_cobrar(payload: CuentaPorCobrarCreate, db: Session = Depends(get_db)) -> CuentaPorCobrar:
-    cuenta = CuentaPorCobrar(**payload.model_dump())
+def crear_cuenta_por_cobrar(
+    payload: CuentaPorCobrarCreate,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> CuentaPorCobrar:
+    cuenta = CuentaPorCobrar(**payload.model_dump(), organizacion_id=org_id)
     db.add(cuenta)
     db.commit()
     db.refresh(cuenta)
@@ -162,8 +234,18 @@ def crear_cuenta_por_cobrar(payload: CuentaPorCobrarCreate, db: Session = Depend
 
 
 @router.post("/cuentas-por-cobrar/{cuenta_id}/pagos", response_model=CuentaPorCobrarOut)
-def registrar_pago_por_cobrar(cuenta_id: int, payload: CuentaPorCobrarPago, db: Session = Depends(get_db)) -> CuentaPorCobrar:
-    cuenta = db.get(CuentaPorCobrar, cuenta_id)
+def registrar_pago_por_cobrar(
+    cuenta_id: int,
+    payload: CuentaPorCobrarPago,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CuentaPorCobrar:
+    cuenta = (
+        db.query(CuentaPorCobrar)
+        .filter(CuentaPorCobrar.id == cuenta_id, CuentaPorCobrar.organizacion_id == org_id)
+        .first()
+    )
     if not cuenta:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
@@ -175,11 +257,13 @@ def registrar_pago_por_cobrar(cuenta_id: int, payload: CuentaPorCobrarPago, db: 
 
     db.add(
         Ingreso(
+            organizacion_id=org_id,
             cliente_id=cuenta.cliente_id,
             orden_id=cuenta.orden_id,
             concepto=f"Abono cuenta por cobrar #{cuenta.id}",
             monto=payload.monto,
-            metodo_pago="efectivo",
+            metodo_pago=MetodoPago.EFECTIVO,
+            usuario_registro_id=usuario.id,
         )
     )
 
@@ -190,16 +274,24 @@ def registrar_pago_por_cobrar(cuenta_id: int, payload: CuentaPorCobrarPago, db: 
 
 # -------------------------------------------------------- Cuentas por pagar
 @router.get("/cuentas-por-pagar", response_model=list[CuentaPorPagarOut])
-def listar_cuentas_por_pagar(estado: EstadoCuenta | None = None, db: Session = Depends(get_db)) -> list[CuentaPorPagar]:
-    query = db.query(CuentaPorPagar)
+def listar_cuentas_por_pagar(
+    estado: EstadoCuenta | None = None,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> list[CuentaPorPagar]:
+    query = db.query(CuentaPorPagar).filter(CuentaPorPagar.organizacion_id == org_id)
     if estado:
         query = query.filter(CuentaPorPagar.estado == estado)
     return query.order_by(CuentaPorPagar.fecha_vencimiento).all()
 
 
 @router.post("/cuentas-por-pagar", response_model=CuentaPorPagarOut, status_code=201)
-def crear_cuenta_por_pagar(payload: CuentaPorPagarCreate, db: Session = Depends(get_db)) -> CuentaPorPagar:
-    cuenta = CuentaPorPagar(**payload.model_dump())
+def crear_cuenta_por_pagar(
+    payload: CuentaPorPagarCreate,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> CuentaPorPagar:
+    cuenta = CuentaPorPagar(**payload.model_dump(), organizacion_id=org_id)
     db.add(cuenta)
     db.commit()
     db.refresh(cuenta)
@@ -207,8 +299,18 @@ def crear_cuenta_por_pagar(payload: CuentaPorPagarCreate, db: Session = Depends(
 
 
 @router.post("/cuentas-por-pagar/{cuenta_id}/pagos", response_model=CuentaPorPagarOut)
-def registrar_pago_por_pagar(cuenta_id: int, payload: CuentaPorPagarPago, db: Session = Depends(get_db)) -> CuentaPorPagar:
-    cuenta = db.get(CuentaPorPagar, cuenta_id)
+def registrar_pago_por_pagar(
+    cuenta_id: int,
+    payload: CuentaPorPagarPago,
+    org_id: int = Depends(get_current_tenant_id),
+    usuario: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CuentaPorPagar:
+    cuenta = (
+        db.query(CuentaPorPagar)
+        .filter(CuentaPorPagar.id == cuenta_id, CuentaPorPagar.organizacion_id == org_id)
+        .first()
+    )
     if not cuenta:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
@@ -220,11 +322,13 @@ def registrar_pago_por_pagar(cuenta_id: int, payload: CuentaPorPagarPago, db: Se
 
     db.add(
         Egreso(
+            organizacion_id=org_id,
             categoria="otros",
             descripcion=f"Pago cuenta por pagar #{cuenta.id} - {cuenta.concepto}",
             monto=payload.monto,
             proveedor_id=cuenta.proveedor_id,
-            metodo_pago="efectivo",
+            metodo_pago=MetodoPago.EFECTIVO,
+            usuario_registro_id=usuario.id,
         )
     )
 

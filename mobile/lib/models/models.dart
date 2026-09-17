@@ -34,6 +34,7 @@ class Vehiculo {
   final int? anio;
   final String? color;
   final int? kilometrajeActual;
+  final String? estado;
   final Cliente? cliente;
 
   Vehiculo({
@@ -45,6 +46,7 @@ class Vehiculo {
     this.anio,
     this.color,
     this.kilometrajeActual,
+    this.estado,
     this.cliente,
   });
 
@@ -57,6 +59,7 @@ class Vehiculo {
         anio: json['anio'],
         color: json['color'],
         kilometrajeActual: json['kilometraje_actual'],
+        estado: json['estado'],
         cliente: json['cliente'] != null ? Cliente.fromJson(json['cliente']) : null,
       );
 
@@ -75,7 +78,7 @@ class PlacaDetectada {
         placaTexto: json['placa_texto'],
         confianza: (json['confianza'] as num).toDouble(),
         vehiculo: json['vehiculo'] != null ? Vehiculo.fromJson(json['vehiculo']) : null,
-        fotoUrl: json['foto_url'],
+        fotoUrl: json['foto_url'] ?? '',
       );
 }
 
@@ -109,30 +112,87 @@ class DetalleOrden {
 class OrdenTrabajo {
   final int id;
   final int vehiculoId;
+  final String? numeroOrden;
   final String fechaIngreso;
+  final String? motivoIngreso;
   final String? descripcionProblema;
   final String estado;
   final double total;
   final List<DetalleOrden> detalles;
+  final Vehiculo? vehiculo;
 
   OrdenTrabajo({
     required this.id,
     required this.vehiculoId,
+    this.numeroOrden,
     required this.fechaIngreso,
+    this.motivoIngreso,
     this.descripcionProblema,
     required this.estado,
     required this.total,
     required this.detalles,
+    this.vehiculo,
   });
 
   factory OrdenTrabajo.fromJson(Map<String, dynamic> json) => OrdenTrabajo(
         id: json['id'],
         vehiculoId: json['vehiculo_id'],
-        fechaIngreso: json['fecha_ingreso'],
+        numeroOrden: json['numero_orden'],
+        fechaIngreso: json['fecha_ingreso'] ?? '',
+        motivoIngreso: json['motivo_ingreso'],
         descripcionProblema: json['descripcion_problema'],
-        estado: json['estado'],
-        total: (json['total'] as num).toDouble(),
-        detalles: (json['detalles'] as List).map((d) => DetalleOrden.fromJson(d)).toList(),
+        estado: json['estado'] ?? '',
+        total: (json['total'] as num?)?.toDouble() ?? 0.0,
+        detalles: (json['detalles'] as List?)?.map((d) => DetalleOrden.fromJson(d)).toList() ?? [],
+        vehiculo: json['vehiculo'] != null ? Vehiculo.fromJson(json['vehiculo']) : null,
+      );
+}
+
+class TimelineEvento {
+  final int ordenId;
+  final String? numeroOrden;
+  final String fecha;
+  final int? kilometraje;
+  final String? motivo;
+  final String? diagnostico;
+  final String? trabajosRealizados;
+  final List<String> repuestosUtilizados;
+  final String? mecanicoNombre;
+  final double costoTotal;
+  final String estado;
+  final List<String> fotos;
+  final String? observaciones;
+
+  TimelineEvento({
+    required this.ordenId,
+    this.numeroOrden,
+    required this.fecha,
+    this.kilometraje,
+    this.motivo,
+    this.diagnostico,
+    this.trabajosRealizados,
+    required this.repuestosUtilizados,
+    this.mecanicoNombre,
+    required this.costoTotal,
+    required this.estado,
+    required this.fotos,
+    this.observaciones,
+  });
+
+  factory TimelineEvento.fromJson(Map<String, dynamic> json) => TimelineEvento(
+        ordenId: json['orden_id'] ?? 0,
+        numeroOrden: json['numero_orden'],
+        fecha: json['fecha'] ?? '',
+        kilometraje: json['kilometraje'],
+        motivo: json['motivo'],
+        diagnostico: json['diagnostico'],
+        trabajosRealizados: json['trabajos_realizados'],
+        repuestosUtilizados: (json['repuestos_utilizados'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        mecanicoNombre: json['mecanico_nombre'],
+        costoTotal: (json['costo_total'] as num?)?.toDouble() ?? 0.0,
+        estado: json['estado'] ?? '',
+        fotos: (json['fotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        observaciones: json['observaciones'],
       );
 }
 

@@ -11,6 +11,7 @@ class IngresoCreate(BaseModel):
     concepto: str
     monto: float
     metodo_pago: MetodoPago
+    numero_referencia: str | None = None
 
 
 class IngresoOut(IngresoCreate):
@@ -20,12 +21,20 @@ class IngresoOut(IngresoCreate):
     comprobante_url: str | None = None
 
 
+class PagoOrdenRequest(BaseModel):
+    monto: float
+    metodo_pago: MetodoPago
+    numero_referencia: str | None = None
+    concepto: str | None = None
+
+
 class EgresoCreate(BaseModel):
     categoria: CategoriaEgreso
     descripcion: str
     monto: float
     proveedor_id: int | None = None
     metodo_pago: MetodoPago
+    numero_comprobante: str | None = None
 
 
 class EgresoOut(EgresoCreate):

@@ -21,9 +21,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     if not usuario.activo:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario inactivo")
 
-    token = create_access_token(subject=str(usuario.id), rol=usuario.rol.value)
+    token = create_access_token(
+        subject=str(usuario.id),
+        rol=usuario.rol.value,
+        organizacion_id=usuario.organizacion_id,
+        sucursal_id=usuario.sucursal_id,
+    )
     return TokenResponse(
-        access_token=token, rol=usuario.rol, nombre=usuario.nombre, usuario_id=usuario.id
+        access_token=token,
+        rol=usuario.rol,
+        nombre=usuario.nombre,
+        usuario_id=usuario.id,
+        organizacion_id=usuario.organizacion_id,
+        sucursal_id=usuario.sucursal_id,
     )
 
 

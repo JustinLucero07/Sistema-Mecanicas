@@ -6,10 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Cambia esto por la URL de tu backend en la VPS al pasar a producción.
 /// 10.0.2.2 es el alias del emulador Android hacia el "localhost" de la
 /// máquina host; en un dispositivo físico usa la IP de tu backend.
-const String kApiBaseUrl = String.fromEnvironment(
-  'API_URL',
-  defaultValue: 'http://10.0.2.2:8000',
-);
+String get kApiBaseUrl {
+  const envUrl = String.fromEnvironment('API_URL');
+  if (envUrl.isNotEmpty) return envUrl;
+  try {
+    if (Platform.isAndroid) return 'http://10.0.2.2:8001';
+  } catch (_) {}
+  return 'http://localhost:8001';
+}
 
 class ApiException implements Exception {
   final int status;

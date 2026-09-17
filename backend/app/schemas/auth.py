@@ -14,3 +14,5 @@ class TokenResponse(BaseModel):
     rol: RolUsuario
     nombre: str
     usuario_id: int
+    organizacion_id: int | None = None
+    sucursal_id: int | None = None

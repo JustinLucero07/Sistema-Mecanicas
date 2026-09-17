@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_admin
+from app.core.deps import get_current_tenant_id, require_admin
 from app.core.security import hash_password
 from app.database import get_db
 from app.models.usuario import Usuario
@@ -11,16 +11,29 @@ router = APIRouter(prefix="/api/usuarios", tags=["usuarios"], dependencies=[Depe
 
 
 @router.get("", response_model=list[UsuarioOut])
-def listar_usuarios(db: Session = Depends(get_db)) -> list[Usuario]:
-    return db.query(Usuario).order_by(Usuario.nombre).all()
+def listar_usuarios(
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> list[Usuario]:
+    return (
+        db.query(Usuario)
+        .filter(Usuario.organizacion_id == org_id)
+        .order_by(Usuario.nombre)
+        .all()
+    )
 
 
 @router.post("", response_model=UsuarioOut, status_code=201)
-def crear_usuario(payload: UsuarioCreate, db: Session = Depends(get_db)) -> Usuario:
+def crear_usuario(
+    payload: UsuarioCreate,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> Usuario:
     if db.query(Usuario).filter(Usuario.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
 
     usuario = Usuario(
+        organizacion_id=org_id,
         nombre=payload.nombre,
         email=payload.email,
         rol=payload.rol,
@@ -35,8 +48,17 @@ def crear_usuario(payload: UsuarioCreate, db: Session = Depends(get_db)) -> Usua
 
 
 @router.patch("/{usuario_id}", response_model=UsuarioOut)
-def actualizar_usuario(usuario_id: int, payload: UsuarioUpdate, db: Session = Depends(get_db)) -> Usuario:
-    usuario = db.get(Usuario, usuario_id)
+def actualizar_usuario(
+    usuario_id: int,
+    payload: UsuarioUpdate,
+    org_id: int = Depends(get_current_tenant_id),
+    db: Session = Depends(get_db),
+) -> Usuario:
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.id == usuario_id, Usuario.organizacion_id == org_id)
+        .first()
+    )
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
