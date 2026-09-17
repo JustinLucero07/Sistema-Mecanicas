@@ -23,7 +23,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: _screens[_index],
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(context).push(

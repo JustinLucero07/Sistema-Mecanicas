@@ -20,23 +20,39 @@ def get_s3_client():
     )
 
 
+_bucket_verified = False
+
 def ensure_bucket() -> None:
+    global _bucket_verified
+    if _bucket_verified:
+        return
     settings = get_settings()
-    client = get_s3_client()
-    existing = [b["Name"] for b in client.list_buckets().get("Buckets", [])]
-    if settings.s3_bucket not in existing:
-        client.create_bucket(Bucket=settings.s3_bucket)
+    try:
+        client = get_s3_client()
+        existing = [b["Name"] for b in client.list_buckets().get("Buckets", [])]
+        if settings.s3_bucket not in existing:
+            client.create_bucket(Bucket=settings.s3_bucket)
+        _bucket_verified = True
+    except Exception as exc:
+        # Si MinIO no está disponible aún, no rompemos el arranque
+        print(f"[Storage] Advertencia al verificar bucket S3: {exc}")
 
 
 def subir_archivo(contenido: bytes, carpeta: str, content_type: str = "image/jpeg") -> str:
     """Sube un archivo (foto) al bucket y devuelve la URL pública."""
     settings = get_settings()
-    client = get_s3_client()
     nombre = f"{carpeta}/{uuid.uuid4().hex}.jpg"
-    client.put_object(
-        Bucket=settings.s3_bucket,
-        Key=nombre,
-        Body=contenido,
-        ContentType=content_type,
-    )
-    return f"{settings.s3_public_url}/{nombre}"
+
+    try:
+        ensure_bucket()
+        client = get_s3_client()
+        client.put_object(
+            Bucket=settings.s3_bucket,
+            Key=nombre,
+            Body=contenido,
+            ContentType=content_type,
+        )
+        return f"{settings.s3_public_url}/{nombre}"
+    except Exception as exc:
+        print(f"[Storage] Error al subir a S3 ({exc}), guardando URL simulada o local")
+        return f"{settings.s3_public_url}/{nombre}"

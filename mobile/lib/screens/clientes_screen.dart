@@ -40,8 +40,16 @@ class _ClientesScreenState extends State<ClientesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Clientes')),
-      floatingActionButton: FloatingActionButton(onPressed: _nuevoCliente, child: const Icon(Icons.add)),
+      appBar: AppBar(
+        title: const Text('Clientes CRM'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add_rounded),
+            tooltip: 'Nuevo Cliente',
+            onPressed: _nuevoCliente,
+          ),
+        ],
+      ),
       body: _error != null
           ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
           : _clientes.isEmpty
