@@ -2,179 +2,152 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* Tokens semánticos: las pantallas nunca usan colores fijos, solo estos. */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card-bg: rgba(255, 255, 255, 0.9);
-  --card-border: rgba(226, 232, 240, 0.9);
-  --accent-amber: #ea580c;
-  --accent-cyan: #0891b2;
-  --accent-indigo: #4f46e5;
-  --accent-emerald: #059669;
+  --canvas: #f2f3f0;
+  --surface: #ffffff;
+  --raised: #f6f7f4;
+  --line: #e1e4df;
+  --line-strong: #c6ccc4;
+  --ink: #16202a;
+  --ink-2: #45525f;
+  --ink-3: #68747f;
+  --brand: #0b6b6b;
+  --brand-hover: #095757;
+  --brand-ink: #ffffff;
+  --brand-soft: #e0efec;
+  --brand-text: #0b6b6b;
+  --ok: #17754a;
+  --ok-soft: #e2f2e9;
+  --warn: #99590a;
+  --warn-soft: #fbefd3;
+  --signal: #e8a317;
+  --bad: #b1301e;
+  --bad-soft: #fbe5e0;
+  --info: #2a5aa3;
+  --info-soft: #e4ecf8;
+  --shadow: 0 1px 2px rgb(22 32 42 / 0.05), 0 8px 24px -12px rgb(22 32 42 / 0.12);
 }
 
 .dark {
-  --background: #0b0f19;
-  --foreground: #f1f5f9;
-  --card-bg: rgba(15, 23, 42, 0.75);
-  --card-border: rgba(255, 255, 255, 0.08);
-  --accent-amber: #f97316;
-  --accent-cyan: #06b6d4;
-  --accent-indigo: #6366f1;
-  --accent-emerald: #10b981;
+  --canvas: #0e1418;
+  --surface: #161f25;
+  --raised: #1c272f;
+  --line: #27333c;
+  --line-strong: #3b4954;
+  --ink: #e9eef1;
+  --ink-2: #b6c2ca;
+  --ink-3: #8d9ba6;
+  --brand: #3db5ac;
+  --brand-hover: #55c4bb;
+  --brand-ink: #05201e;
+  --brand-soft: #123537;
+  --brand-text: #5fcfc6;
+  --ok: #55c892;
+  --ok-soft: #143326;
+  --warn: #f0b341;
+  --warn-soft: #382a0b;
+  --signal: #f0b341;
+  --bad: #f2877a;
+  --bad-soft: #3c1a15;
+  --info: #84b3f2;
+  --info-soft: #16283f;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 28px -14px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-text: var(--brand-text);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-signal: var(--signal);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-barlow), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  font-size: 15px;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  overflow-x: hidden;
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.08), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 10%, rgba(249, 115, 22, 0.05), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 0% 90%, rgba(6, 182, 212, 0.04), transparent 60%);
-  background-attachment: fixed;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
   min-height: 100vh;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-.dark body {
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.15), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 10%, rgba(249, 115, 22, 0.08), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 0% 90%, rgba(6, 182, 212, 0.06), transparent 60%);
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
-/* Custom Glassmorphic Utilities - Light & Dark adaptive */
-.glass-panel {
-  background: var(--card-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06);
+button,
+[role="button"],
+select,
+summary {
+  cursor: pointer;
 }
 
-.dark .glass-panel {
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+button:disabled {
+  cursor: not-allowed;
 }
 
-.glass-card {
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--card-border);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 10px -1px rgba(0, 0, 0, 0.04);
+::selection {
+  background: var(--brand-soft);
+  color: var(--ink);
 }
 
-.glass-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.1);
-}
-
-.dark .glass-card:hover {
-  background: rgba(30, 41, 59, 0.65);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.45);
-}
-
-/* Glow effects */
-.glow-amber {
-  box-shadow: 0 0 24px -4px rgba(249, 115, 22, 0.35);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 24px -4px rgba(6, 182, 212, 0.35);
-}
-
-.glow-emerald {
-  box-shadow: 0 0 24px -4px rgba(16, 185, 129, 0.35);
-}
-
-.glow-indigo {
-  box-shadow: 0 0 24px -4px rgba(99, 102, 241, 0.35);
-}
-
-/* Metallic License Plate Component Style */
-.plate-badge {
-  background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
-  color: #0f172a;
-  border: 2px solid #334155;
-  box-shadow: 
-    inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    0 2px 6px rgba(0, 0, 0, 0.15);
-  font-family: var(--font-geist-mono), monospace;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  position: relative;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
-}
-
-.plate-badge::before,
-.plate-badge::after {
-  content: "";
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #64748b;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.5);
-  top: 50%;
-  transform: translateY(-50%);
-}
-.plate-badge::before { left: 5px; }
-.plate-badge::after { right: 5px; }
-
-/* Keyframe animations */
-@keyframes laserSweep {
-  0% {
-    top: 5%;
-    opacity: 0.9;
-  }
-  50% {
-    top: 92%;
-    opacity: 1;
-  }
-  100% {
-    top: 5%;
-    opacity: 0.9;
-  }
-}
-
-.animate-laser {
-  animation: laserSweep 2.2s ease-in-out infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.05);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2.5s ease-in-out infinite;
-}
-
-/* Subtle scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: var(--line-strong);
   border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+.overlay-in {
+  animation: overlay-in 0.15s ease-out;
+}
+.dialog-in {
+  animation: dialog-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "taller-mecanica-v1";
+const CACHE_NAME = "mecanicaos-v2";
 const APP_SHELL = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

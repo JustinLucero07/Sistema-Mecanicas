@@ -175,6 +175,7 @@ export interface Repuesto {
   costo_compra: number;
   precio_venta: number;
   unidad: string | null;
+  ubicacion?: string | null;
 }
 
 export interface Proveedor {

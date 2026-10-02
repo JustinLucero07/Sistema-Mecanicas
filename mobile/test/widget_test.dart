@@ -18,7 +18,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('MecánicaOS Pro'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Ingresar al Taller'), findsOneWidget);
+    expect(find.text('Entrar al taller'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Entrar'), findsOneWidget);
   });
 }

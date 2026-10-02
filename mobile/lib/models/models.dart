@@ -1,28 +1,27 @@
+double _num(dynamic v) => (v as num?)?.toDouble() ?? 0.0;
+
 class Cliente {
   final int id;
   final String nombre;
+  final String? apellidos;
   final String? cedulaRuc;
   final String? telefono;
+  final String? whatsapp;
   final String? email;
-  final String? direccion;
 
-  Cliente({
-    required this.id,
-    required this.nombre,
-    this.cedulaRuc,
-    this.telefono,
-    this.email,
-    this.direccion,
-  });
+  Cliente({required this.id, required this.nombre, this.apellidos, this.cedulaRuc, this.telefono, this.whatsapp, this.email});
 
   factory Cliente.fromJson(Map<String, dynamic> json) => Cliente(
         id: json['id'],
         nombre: json['nombre'],
+        apellidos: json['apellidos'],
         cedulaRuc: json['cedula_ruc'],
         telefono: json['telefono'],
+        whatsapp: json['whatsapp'],
         email: json['email'],
-        direccion: json['direccion'],
       );
+
+  String get nombreCompleto => [nombre, apellidos].where((e) => e != null && e.isNotEmpty).join(' ');
 }
 
 class Vehiculo {
@@ -34,6 +33,7 @@ class Vehiculo {
   final int? anio;
   final String? color;
   final int? kilometrajeActual;
+  final int? proximoMantenimientoKm;
   final String? estado;
   final Cliente? cliente;
 
@@ -46,6 +46,7 @@ class Vehiculo {
     this.anio,
     this.color,
     this.kilometrajeActual,
+    this.proximoMantenimientoKm,
     this.estado,
     this.cliente,
   });
@@ -59,27 +60,27 @@ class Vehiculo {
         anio: json['anio'],
         color: json['color'],
         kilometrajeActual: json['kilometraje_actual'],
+        proximoMantenimientoKm: json['proximo_mantenimiento_km'],
         estado: json['estado'],
         cliente: json['cliente'] != null ? Cliente.fromJson(json['cliente']) : null,
       );
 
-  String get descripcionCorta => [marca, modelo, anio?.toString()].where((e) => e != null && e.isNotEmpty).join(' ');
+  String get nombre {
+    final t = [marca, modelo, anio?.toString()].where((e) => e != null && e.isNotEmpty).join(' ');
+    return t.isEmpty ? 'Sin marca ni modelo' : t;
+  }
+
+  bool get enTaller => estado == 'en_taller';
 }
 
 class PlacaDetectada {
   final String placaTexto;
   final double confianza;
-  final Vehiculo? vehiculo;
-  final String fotoUrl;
 
-  PlacaDetectada({required this.placaTexto, required this.confianza, this.vehiculo, required this.fotoUrl});
+  PlacaDetectada({required this.placaTexto, required this.confianza});
 
-  factory PlacaDetectada.fromJson(Map<String, dynamic> json) => PlacaDetectada(
-        placaTexto: json['placa_texto'],
-        confianza: (json['confianza'] as num).toDouble(),
-        vehiculo: json['vehiculo'] != null ? Vehiculo.fromJson(json['vehiculo']) : null,
-        fotoUrl: json['foto_url'] ?? '',
-      );
+  factory PlacaDetectada.fromJson(Map<String, dynamic> json) =>
+      PlacaDetectada(placaTexto: json['placa_texto'], confianza: _num(json['confianza']));
 }
 
 class DetalleOrden {
@@ -87,65 +88,101 @@ class DetalleOrden {
   final String tipo;
   final String descripcion;
   final double cantidad;
-  final double precioUnitario;
   final double subtotal;
 
-  DetalleOrden({
-    required this.id,
-    required this.tipo,
-    required this.descripcion,
-    required this.cantidad,
-    required this.precioUnitario,
-    required this.subtotal,
-  });
+  DetalleOrden({required this.id, required this.tipo, required this.descripcion, required this.cantidad, required this.subtotal});
 
   factory DetalleOrden.fromJson(Map<String, dynamic> json) => DetalleOrden(
         id: json['id'],
         tipo: json['tipo'],
         descripcion: json['descripcion'],
-        cantidad: (json['cantidad'] as num).toDouble(),
-        precioUnitario: (json['precio_unitario'] as num).toDouble(),
-        subtotal: (json['subtotal'] as num).toDouble(),
+        cantidad: _num(json['cantidad']),
+        subtotal: _num(json['subtotal']),
       );
+}
+
+class FotoOrden {
+  final int id;
+  final String tipo;
+  final String url;
+
+  FotoOrden({required this.id, required this.tipo, required this.url});
+
+  factory FotoOrden.fromJson(Map<String, dynamic> json) => FotoOrden(id: json['id'], tipo: json['tipo'], url: json['url']);
+}
+
+class Checklist {
+  final int nivelCombustible;
+  final String? observaciones;
+
+  Checklist({required this.nivelCombustible, this.observaciones});
+
+  factory Checklist.fromJson(Map<String, dynamic> json) =>
+      Checklist(nivelCombustible: json['nivel_combustible'] ?? 50, observaciones: json['observaciones_recepcion']);
 }
 
 class OrdenTrabajo {
   final int id;
   final int vehiculoId;
+  final int? mecanicoId;
+  final String? mecanicoNombre;
   final String? numeroOrden;
   final String fechaIngreso;
+  final int? kilometrajeIngreso;
   final String? motivoIngreso;
-  final String? descripcionProblema;
+  final String? diagnostico;
+  final String? trabajosRealizados;
   final String estado;
   final double total;
   final List<DetalleOrden> detalles;
+  final List<FotoOrden> fotos;
+  final Checklist? checklist;
   final Vehiculo? vehiculo;
+  final Cliente? cliente;
 
   OrdenTrabajo({
     required this.id,
     required this.vehiculoId,
+    this.mecanicoId,
+    this.mecanicoNombre,
     this.numeroOrden,
     required this.fechaIngreso,
+    this.kilometrajeIngreso,
     this.motivoIngreso,
-    this.descripcionProblema,
+    this.diagnostico,
+    this.trabajosRealizados,
     required this.estado,
     required this.total,
     required this.detalles,
+    required this.fotos,
+    this.checklist,
     this.vehiculo,
+    this.cliente,
   });
 
   factory OrdenTrabajo.fromJson(Map<String, dynamic> json) => OrdenTrabajo(
         id: json['id'],
         vehiculoId: json['vehiculo_id'],
+        mecanicoId: json['mecanico_id'],
+        mecanicoNombre: json['mecanico']?['nombre'],
         numeroOrden: json['numero_orden'],
         fechaIngreso: json['fecha_ingreso'] ?? '',
+        kilometrajeIngreso: json['kilometraje_ingreso'],
         motivoIngreso: json['motivo_ingreso'],
-        descripcionProblema: json['descripcion_problema'],
+        diagnostico: json['diagnostico'],
+        trabajosRealizados: json['trabajos_realizados'],
         estado: json['estado'] ?? '',
-        total: (json['total'] as num?)?.toDouble() ?? 0.0,
-        detalles: (json['detalles'] as List?)?.map((d) => DetalleOrden.fromJson(d)).toList() ?? [],
+        total: _num(json['total']),
+        detalles: (json['detalles'] as List? ?? []).map((d) => DetalleOrden.fromJson(d)).toList(),
+        fotos: (json['fotos'] as List? ?? []).map((f) => FotoOrden.fromJson(f)).toList(),
+        checklist: json['checklist_recepcion'] != null ? Checklist.fromJson(json['checklist_recepcion']) : null,
         vehiculo: json['vehiculo'] != null ? Vehiculo.fromJson(json['vehiculo']) : null,
+        cliente: json['cliente'] != null ? Cliente.fromJson(json['cliente']) : null,
       );
+
+  String get numero => numeroOrden ?? 'OT-$id';
+  bool get cerrada => estado == 'entregado' || estado == 'cancelado';
+  String get nombreCliente => (cliente ?? vehiculo?.cliente)?.nombreCompleto ?? 'Sin cliente';
 }
 
 class TimelineEvento {
@@ -156,12 +193,10 @@ class TimelineEvento {
   final String? motivo;
   final String? diagnostico;
   final String? trabajosRealizados;
-  final List<String> repuestosUtilizados;
+  final List<String> repuestos;
   final String? mecanicoNombre;
   final double costoTotal;
   final String estado;
-  final List<String> fotos;
-  final String? observaciones;
 
   TimelineEvento({
     required this.ordenId,
@@ -171,12 +206,10 @@ class TimelineEvento {
     this.motivo,
     this.diagnostico,
     this.trabajosRealizados,
-    required this.repuestosUtilizados,
+    required this.repuestos,
     this.mecanicoNombre,
     required this.costoTotal,
     required this.estado,
-    required this.fotos,
-    this.observaciones,
   });
 
   factory TimelineEvento.fromJson(Map<String, dynamic> json) => TimelineEvento(
@@ -187,74 +220,9 @@ class TimelineEvento {
         motivo: json['motivo'],
         diagnostico: json['diagnostico'],
         trabajosRealizados: json['trabajos_realizados'],
-        repuestosUtilizados: (json['repuestos_utilizados'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        repuestos: (json['repuestos_utilizados'] as List? ?? []).map((e) => e.toString()).toList(),
         mecanicoNombre: json['mecanico_nombre'],
-        costoTotal: (json['costo_total'] as num?)?.toDouble() ?? 0.0,
+        costoTotal: _num(json['costo_total']),
         estado: json['estado'] ?? '',
-        fotos: (json['fotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
-        observaciones: json['observaciones'],
-      );
-}
-
-class ResumenMensual {
-  final int anio;
-  final int mes;
-  final double ingresosTotal;
-  final double egresosTotal;
-  final double balanceNeto;
-  final double? variacionBalancePct;
-
-  ResumenMensual({
-    required this.anio,
-    required this.mes,
-    required this.ingresosTotal,
-    required this.egresosTotal,
-    required this.balanceNeto,
-    this.variacionBalancePct,
-  });
-
-  factory ResumenMensual.fromJson(Map<String, dynamic> json) => ResumenMensual(
-        anio: json['anio'],
-        mes: json['mes'],
-        ingresosTotal: (json['ingresos_total'] as num).toDouble(),
-        egresosTotal: (json['egresos_total'] as num).toDouble(),
-        balanceNeto: (json['balance_neto'] as num).toDouble(),
-        variacionBalancePct: (json['variacion_balance_pct'] as num?)?.toDouble(),
-      );
-}
-
-class PuntoTendencia {
-  final int anio;
-  final int mes;
-  final double balanceNeto;
-
-  PuntoTendencia({required this.anio, required this.mes, required this.balanceNeto});
-
-  factory PuntoTendencia.fromJson(Map<String, dynamic> json) => PuntoTendencia(
-        anio: json['anio'],
-        mes: json['mes'],
-        balanceNeto: (json['balance_neto'] as num).toDouble(),
-      );
-}
-
-class DashboardFinanciero {
-  final ResumenMensual resumenMesActual;
-  final List<PuntoTendencia> tendencia12Meses;
-  final double cuentasPorCobrarTotal;
-  final double cuentasPorPagarTotal;
-
-  DashboardFinanciero({
-    required this.resumenMesActual,
-    required this.tendencia12Meses,
-    required this.cuentasPorCobrarTotal,
-    required this.cuentasPorPagarTotal,
-  });
-
-  factory DashboardFinanciero.fromJson(Map<String, dynamic> json) => DashboardFinanciero(
-        resumenMesActual: ResumenMensual.fromJson(json['resumen_mes_actual']),
-        tendencia12Meses:
-            (json['tendencia_12_meses'] as List).map((p) => PuntoTendencia.fromJson(p)).toList(),
-        cuentasPorCobrarTotal: (json['cuentas_por_cobrar_total'] as num).toDouble(),
-        cuentasPorPagarTotal: (json['cuentas_por_pagar_total'] as num).toDouble(),
       );
 }

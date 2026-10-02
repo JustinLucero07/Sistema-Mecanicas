@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile/screens/home_shell.dart';
 import 'package:mobile/screens/escanear_placa_screen.dart';
 import 'package:mobile/services/auth_service.dart';
+import 'package:mobile/theme.dart';
 
 void main() {
   setUp(() {
@@ -17,8 +18,9 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider(
         create: (_) => AuthService(),
-        child: const MaterialApp(
-          home: HomeShell(),
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: const HomeShell(),
         ),
       ),
     );
@@ -39,8 +41,9 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider(
         create: (_) => AuthService(),
-        child: const MaterialApp(
-          home: EscanearPlacaScreen(),
+        child: MaterialApp(
+          theme: buildTheme(Brightness.dark),
+          home: const EscanearPlacaScreen(),
         ),
       ),
     );

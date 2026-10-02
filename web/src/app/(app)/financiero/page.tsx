@@ -1,22 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  Lock,
-  Unlock,
-  DollarSign,
-  Plus,
-  ArrowUpRight,
-  ArrowDownRight,
-  AlertCircle,
-  CheckCircle2,
-  Receipt,
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Minus, Plus, Receipt } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { formatoMoneda } from "@/lib/format";
+import { etiqueta, formatoFecha, formatoMoneda } from "@/lib/format";
+import { Alert, Badge, Button, Card, CardHeader, EmptyState, Field, Input, Modal, PageHeader, Select, Skeleton, Tabs, Td, Th, cn } from "@/components/ui";
 
 interface Ingreso {
   id: number;
@@ -37,7 +25,6 @@ interface Egreso {
 
 interface Caja {
   id: number;
-  fecha: string;
   monto_apertura: number;
   monto_cierre_esperado: number | null;
   monto_cierre_real: number | null;
@@ -45,575 +32,335 @@ interface Caja {
   cerrada: boolean;
 }
 
-const CATEGORIAS_EGRESO = [
-  "nomina", "repuestos", "alquiler", "servicios_basicos", "herramientas",
-  "impuestos", "marketing", "mantenimiento_local", "otros",
-];
+const CATEGORIAS_EGRESO = ["repuestos", "nomina", "alquiler", "servicios_basicos", "herramientas", "impuestos", "marketing", "mantenimiento_local", "otros"];
+const NOMBRE_CATEGORIA: Record<string, string> = { nomina: "Sueldos", servicios_basicos: "Servicios básicos", mantenimiento_local: "Mantenimiento del local" };
+const nombreCategoria = (c: string) => NOMBRE_CATEGORIA[c] ?? etiqueta(c);
 
-type Tab = "ingresos" | "egresos" | "caja";
+const METODOS = (
+  <>
+    <option value="efectivo">Efectivo</option>
+    <option value="transferencia">Transferencia</option>
+    <option value="tarjeta">Tarjeta</option>
+    <option value="otro">Otro</option>
+  </>
+);
+
+type Tab = "ingresos" | "egresos";
+
+function mesActual(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function rangoMes(mes: string): { desde: string; hasta: string } {
+  const [anio, m] = mes.split("-").map(Number);
+  const fin = new Date(anio, m, 1);
+  return { desde: `${mes}-01`, hasta: `${fin.getFullYear()}-${String(fin.getMonth() + 1).padStart(2, "0")}-01` };
+}
 
 export default function FinancieroPage() {
+  const [mes, setMes] = useState(mesActual);
   const [tab, setTab] = useState<Tab>("ingresos");
-  const [ingresos, setIngresos] = useState<Ingreso[]>([]);
-  const [egresos, setEgresos] = useState<Egreso[]>([]);
+  const [ingresos, setIngresos] = useState<Ingreso[] | null>(null);
+  const [egresos, setEgresos] = useState<Egreso[] | null>(null);
   const [caja, setCaja] = useState<Caja | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
+  const [modal, setModal] = useState<Tab | null>(null);
   const [formIngreso, setFormIngreso] = useState({ concepto: "", monto: "", metodo_pago: "efectivo" });
   const [formEgreso, setFormEgreso] = useState({ categoria: "repuestos", descripcion: "", monto: "", metodo_pago: "efectivo" });
-  const [montoApertura, setMontoApertura] = useState("");
-  const [montoCierre, setMontoCierre] = useState("");
+  const [montoCaja, setMontoCaja] = useState("");
+  const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
-  function cargarTodo() {
-    api.get<Ingreso[]>("/api/financiero/ingresos").then(setIngresos).catch(() => {});
-    api.get<Egreso[]>("/api/financiero/egresos").then(setEgresos).catch(() => {});
+  const cargar = useCallback(() => {
+    const { desde, hasta } = rangoMes(mes);
+    const rango = `?desde=${desde}&hasta=${hasta}`;
+    const alFallar = (err: unknown) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar los movimientos.");
+    api.get<Ingreso[]>(`/api/financiero/ingresos${rango}`).then(setIngresos).catch(alFallar);
+    api.get<Egreso[]>(`/api/financiero/egresos${rango}`).then(setEgresos).catch(alFallar);
     api.get<Caja | null>("/api/financiero/caja/hoy").then(setCaja).catch(() => setCaja(null));
-  }
+  }, [mes]);
 
-  useEffect(cargarTodo, []);
+  useEffect(cargar, [cargar]);
 
-  async function registrarIngreso(e: React.FormEvent) {
-    e.preventDefault();
+  async function guardar(accion: () => Promise<unknown>, alTerminar: () => void, enModal = true) {
+    setErrorForm(null);
     setError(null);
+    setGuardando(true);
     try {
-      await api.post("/api/financiero/ingresos", {
-        concepto: formIngreso.concepto,
-        monto: Number(formIngreso.monto),
-        metodo_pago: formIngreso.metodo_pago,
-      });
-      setFormIngreso({ concepto: "", monto: "", metodo_pago: "efectivo" });
-      cargarTodo();
+      await accion();
+      alTerminar();
+      cargar();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo registrar el ingreso");
+      const mensaje = err instanceof ApiError ? err.message : "No se pudo guardar. Inténtalo de nuevo.";
+      if (enModal) setErrorForm(mensaje);
+      else setError(mensaje);
+    } finally {
+      setGuardando(false);
     }
   }
 
-  async function registrarEgreso(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.post("/api/financiero/egresos", {
-        categoria: formEgreso.categoria,
-        descripcion: formEgreso.descripcion,
-        monto: Number(formEgreso.monto),
-        metodo_pago: formEgreso.metodo_pago,
-      });
-      setFormEgreso({ categoria: "repuestos", descripcion: "", monto: "", metodo_pago: "efectivo" });
-      cargarTodo();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo registrar el egreso");
-    }
-  }
-
-  async function abrirCaja(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.post("/api/financiero/caja/abrir", { monto_apertura: Number(montoApertura) });
-      setMontoApertura("");
-      cargarTodo();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo abrir la caja");
-    }
-  }
-
-  async function cerrarCaja(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.post("/api/financiero/caja/cerrar", { monto_cierre_real: Number(montoCierre) });
-      setMontoCierre("");
-      cargarTodo();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cerrar la caja");
-    }
-  }
-
-  const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
-  const totalEgresos = egresos.reduce((sum, e) => sum + e.monto, 0);
+  const totalIngresos = (ingresos ?? []).reduce((s, i) => s + i.monto, 0);
+  const totalEgresos = (egresos ?? []).reduce((s, e) => s + e.monto, 0);
+  const utilidad = totalIngresos - totalEgresos;
+  const cargando = ingresos === null || egresos === null;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-orange-400" />
-            Finanzas & Control de Caja Diaria
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Registro de cobros, egresos operativos, y arqueo de turnos de caja
-          </p>
-        </div>
+    <>
+      <PageHeader
+        title="Caja y finanzas"
+        description="Los cobros de órdenes entran solos. Registra aquí los demás ingresos y todos los gastos."
+        actions={
+          <>
+            <Button variant="secondary" icon={Minus} onClick={() => setModal("egresos")}>
+              Registrar egreso
+            </Button>
+            <Button icon={Plus} onClick={() => setModal("ingresos")}>
+              Registrar ingreso
+            </Button>
+          </>
+        }
+      />
 
-        {/* Resumen Superior Rápido */}
-        <div className="flex items-center gap-3 text-xs">
-          <div className="p-2.5 rounded-xl glass-panel border border-slate-800 flex items-center gap-2">
-            <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <ArrowUpRight className="w-3.5 h-3.5" />
+      {error && <Alert>{error}</Alert>}
+
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_22rem]">
+        <div className="space-y-4">
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+              <h2 className="font-display text-xl font-semibold">Resumen del mes</h2>
+              <Input type="month" value={mes} max={mesActual()} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mes" className="w-44" />
             </div>
-            <div>
-              <span className="text-[10px] text-slate-500 uppercase block">Ingresos:</span>
-              <span className="font-mono font-bold text-emerald-400">{formatoMoneda(totalIngresos)}</span>
-            </div>
-          </div>
+            <dl className="grid divide-line max-sm:divide-y sm:grid-cols-3 sm:divide-x">
+              {[
+                { label: "Ingresos", valor: totalIngresos, clase: "text-ink" },
+                { label: "Egresos", valor: totalEgresos, clase: "text-ink" },
+                { label: "Utilidad", valor: utilidad, clase: utilidad >= 0 ? "text-ok" : "text-bad" },
+              ].map((c) => (
+                <div key={c.label} className="px-5 py-4">
+                  <dt className="text-[0.87rem] text-ink-3">{c.label}</dt>
+                  <dd className={cn("mt-1 font-display text-[2.1rem] leading-none font-semibold", c.clase)}>{cargando ? "…" : formatoMoneda(c.valor)}</dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
 
-          <div className="p-2.5 rounded-xl glass-panel border border-slate-800 flex items-center gap-2">
-            <div className="p-1 rounded-lg bg-rose-500/10 text-rose-400">
-              <ArrowDownRight className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-500 uppercase block">Egresos:</span>
-              <span className="font-mono font-bold text-rose-400">{formatoMoneda(totalEgresos)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-800/80 pb-3">
-        {[
-          { id: "ingresos", label: `Ingresos (${ingresos.length})`, icon: TrendingUp },
-          { id: "egresos", label: `Egresos (${egresos.length})`, icon: TrendingDown },
-          { id: "caja", label: "Caja Diaria / Turno", icon: Wallet },
-        ].map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id as Tab)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                active
-                  ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-                  : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-slate-800"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {error && (
-        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* PESTAÑA: INGRESOS */}
-      {tab === "ingresos" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <form
-            onSubmit={registrarIngreso}
-            className="rounded-2xl glass-panel border border-slate-800/80 p-5 space-y-4 shadow-xl"
-          >
-            <div className="border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-400" />
-                Registrar Nuevo Ingreso
-              </h2>
-              <p className="text-[11px] text-slate-400">Cobro de servicio, anticipo o venta rápida</p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Concepto / Glosa</label>
-              <input
-                required
-                placeholder="Ej: Mano de obra cambio pastillas freno"
-                value={formIngreso.concepto}
-                onChange={(e) => setFormIngreso({ ...formIngreso, concepto: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+          <Card className="overflow-hidden">
+            <div className="px-3 pt-1">
+              <Tabs
+                value={tab}
+                onChange={setTab}
+                items={[
+                  { value: "ingresos", label: "Ingresos", count: ingresos?.length },
+                  { value: "egresos", label: "Egresos", count: egresos?.length },
+                ]}
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Monto ($ USD)</label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={formIngreso.monto}
-                onChange={(e) => setFormIngreso({ ...formIngreso, monto: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Método de Pago</label>
-              <select
-                value={formIngreso.metodo_pago}
-                onChange={(e) => setFormIngreso({ ...formIngreso, metodo_pago: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                <option value="transferencia">Transferencia Bancaria</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
-            >
-              Registrar Ingreso
-            </button>
-          </form>
-
-          {/* Tabla de Ingresos */}
-          <div className="lg:col-span-2 rounded-2xl glass-panel border border-slate-800/80 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                Libro de Ingresos Recientes
-              </h3>
-              <span className="text-[11px] font-mono text-slate-400">Total: {ingresos.length}</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-950/60 text-slate-400 text-left border-b border-slate-800">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Fecha</th>
-                    <th className="px-4 py-3 font-semibold">Concepto</th>
-                    <th className="px-4 py-3 font-semibold">Método</th>
-                    <th className="px-4 py-3 font-semibold text-right">Monto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {ingresos.map((i) => (
-                    <tr key={i.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="px-4 py-3 font-mono text-slate-400 whitespace-nowrap">
-                        {new Date(i.fecha).toLocaleDateString("es-EC")}
-                      </td>
-                      <td className="px-4 py-3 text-slate-200 font-medium">{i.concepto}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-mono capitalize">
-                          {i.metodo_pago}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
-                        +{formatoMoneda(i.monto)}
-                      </td>
-                    </tr>
-                  ))}
-                  {ingresos.length === 0 && (
+            {cargando ? (
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+              </div>
+            ) : (tab === "ingresos" ? ingresos : egresos).length === 0 ? (
+              <EmptyState icon={Receipt} title={tab === "ingresos" ? "Sin ingresos este mes" : "Sin egresos este mes"} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[32rem]">
+                  <thead className="border-b border-line">
                     <tr>
-                      <td colSpan={4} className="px-4 py-12 text-center text-slate-500">
-                        No hay ingresos registrados en el período.
-                      </td>
+                      <Th>Fecha</Th>
+                      <Th>{tab === "ingresos" ? "Concepto" : "Descripción"}</Th>
+                      <Th>Forma de pago</Th>
+                      <Th className="text-right">Monto</Th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {tab === "ingresos"
+                      ? ingresos.map((i) => (
+                          <tr key={i.id}>
+                            <Td className="whitespace-nowrap text-ink-2">{formatoFecha(i.fecha)}</Td>
+                            <Td className="font-semibold">{i.concepto}</Td>
+                            <Td className="text-ink-2">{etiqueta(i.metodo_pago)}</Td>
+                            <Td className="text-right font-semibold">{formatoMoneda(i.monto)}</Td>
+                          </tr>
+                        ))
+                      : egresos.map((e) => (
+                          <tr key={e.id}>
+                            <Td className="whitespace-nowrap text-ink-2">{formatoFecha(e.fecha)}</Td>
+                            <Td>
+                              <p className="font-semibold">{e.descripcion}</p>
+                              <p className="text-[0.87rem] text-ink-3">{nombreCategoria(e.categoria)}</p>
+                            </Td>
+                            <Td className="text-ink-2">{etiqueta(e.metodo_pago)}</Td>
+                            <Td className="text-right font-semibold">{formatoMoneda(e.monto)}</Td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
-      )}
 
-      {/* PESTAÑA: EGRESOS */}
-      {tab === "egresos" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <form
-            onSubmit={registrarEgreso}
-            className="rounded-2xl glass-panel border border-slate-800/80 p-5 space-y-4 shadow-xl"
-          >
-            <div className="border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-rose-400" />
-                Registrar Nuevo Egreso
-              </h2>
-              <p className="text-[11px] text-slate-400">Compra de repuestos, sueldos o servicios del local</p>
-            </div>
+        <Card>
+          <CardHeader
+            title="Caja de hoy"
+            action={caja === undefined ? null : caja === null ? <Badge>Sin abrir</Badge> : caja.cerrada ? <Badge>Cerrada</Badge> : <Badge tone="ok">Abierta</Badge>}
+          />
+          <div className="p-5">
+            {caja === undefined && <Skeleton className="h-24" />}
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Categoría de Gasto</label>
-              <select
-                value={formEgreso.categoria}
-                onChange={(e) => setFormEgreso({ ...formEgreso, categoria: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500 capitalize"
+            {caja === null && (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  guardar(() => api.post("/api/financiero/caja/abrir", { monto_apertura: Number(montoCaja) }), () => setMontoCaja(""), false);
+                }}
               >
-                {CATEGORIAS_EGRESO.map((c) => (
-                  <option key={c} value={c}>
-                    {c.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Descripción / Proveedor</label>
-              <input
-                required
-                placeholder="Ej: Compra de 5 galones aceite 20W50"
-                value={formEgreso.descripcion}
-                onChange={(e) => setFormEgreso({ ...formEgreso, descripcion: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Monto ($ USD)</label>
-              <input
-                required
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={formEgreso.monto}
-                onChange={(e) => setFormEgreso({ ...formEgreso, monto: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Método de Pago</label>
-              <select
-                value={formEgreso.metodo_pago}
-                onChange={(e) => setFormEgreso({ ...formEgreso, metodo_pago: e.target.value })}
-                className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia Bancaria</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
-            >
-              Registrar Egreso
-            </button>
-          </form>
-
-          {/* Tabla de Egresos */}
-          <div className="lg:col-span-2 rounded-2xl glass-panel border border-slate-800/80 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                Libro de Egresos Recientes
-              </h3>
-              <span className="text-[11px] font-mono text-slate-400">Total: {egresos.length}</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-950/60 text-slate-400 text-left border-b border-slate-800">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Fecha</th>
-                    <th className="px-4 py-3 font-semibold">Categoría</th>
-                    <th className="px-4 py-3 font-semibold">Descripción</th>
-                    <th className="px-4 py-3 font-semibold text-right">Monto</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {egresos.map((eg) => (
-                    <tr key={eg.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="px-4 py-3 font-mono text-slate-400 whitespace-nowrap">
-                        {new Date(eg.fecha).toLocaleDateString("es-EC")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-mono capitalize">
-                          {eg.categoria.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-200 font-medium">{eg.descripcion}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-rose-400 whitespace-nowrap">
-                        -{formatoMoneda(eg.monto)}
-                      </td>
-                    </tr>
-                  ))}
-                  {egresos.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-12 text-center text-slate-500">
-                        No hay egresos registrados en el período.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PESTAÑA: CONTROL DE CAJA DIARIA */}
-      {tab === "caja" && (
-        <div className="max-w-xl mx-auto space-y-6">
-          {caja === undefined && (
-            <div className="h-48 rounded-2xl bg-slate-900/40 animate-pulse border border-slate-800" />
-          )}
-
-          {/* Caja sin abrir */}
-          {caja === null && (
-            <form
-              onSubmit={abrirCaja}
-              className="rounded-2xl glass-panel border border-slate-800/80 p-6 space-y-5 shadow-2xl"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                  <Unlock className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-white">Apertura de Caja Diaria</h2>
-                  <p className="text-xs text-slate-400">
-                    Registra el fondo base en efectivo para comenzar la jornada de hoy.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  Monto de Apertura en Efectivo ($ USD)
-                </label>
-                <input
-                  required
-                  type="number"
-                  step="0.01"
-                  placeholder="50.00"
-                  value={montoApertura}
-                  onChange={(e) => setMontoApertura(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold shadow-lg shadow-orange-600/20 transition-all"
-              >
-                Abrir Caja del Taller
-              </button>
-            </form>
-          )}
-
-          {/* Caja Abierta */}
-          {caja && !caja.cerrada && (
-            <div className="rounded-2xl glass-panel border border-slate-800/80 p-6 space-y-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <Unlock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                      Caja Diaria Abierta
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    </h2>
-                    <p className="text-xs text-slate-400">
-                      Fecha: {new Date(caja.fecha).toLocaleDateString("es-EC")}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[10px] font-mono text-slate-500 uppercase block">Fondo Apertura:</span>
-                  <span className="text-sm font-mono font-bold text-emerald-400">
-                    {formatoMoneda(caja.monto_apertura)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Formulario de Cierre de Caja */}
-              <form onSubmit={cerrarCaja} className="space-y-4 pt-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300">
-                    Arqueo de Efectivo al Cierre ($ USD Real en Gaveta)
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    step="0.01"
-                    placeholder="Monto contado físicamente al cerrar..."
-                    value={montoCierre}
-                    onChange={(e) => setMontoCierre(e.target.value)}
-                    className="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-orange-500"
-                  />
-                  <p className="text-[11px] text-slate-500">
-                    El sistema calculará automáticamente la diferencia con los ingresos y egresos registrados.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-600/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <Lock className="w-4 h-4" /> Cuadrar y Cerrar Caja Diaria
-                </button>
+                <p className="text-ink-2">Cuenta el efectivo con el que empieza el día.</p>
+                <Field label="Efectivo inicial">
+                  <Input type="number" min={0} step="0.01" required value={montoCaja} onChange={(e) => setMontoCaja(e.target.value)} />
+                </Field>
+                <Button type="submit" className="w-full" disabled={guardando}>
+                  Abrir caja
+                </Button>
               </form>
-            </div>
-          )}
+            )}
 
-          {/* Caja Cerrada */}
-          {caja && caja.cerrada && (
-            <div className="rounded-2xl glass-panel border border-slate-800/80 p-6 space-y-5 shadow-2xl">
-              <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-                <div className="p-2.5 rounded-xl bg-slate-800 text-slate-400">
-                  <Lock className="w-5 h-5" />
+            {caja && !caja.cerrada && (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  guardar(() => api.post("/api/financiero/caja/cerrar", { monto_cierre_real: Number(montoCaja) }), () => setMontoCaja(""), false);
+                }}
+              >
+                <div className="flex justify-between text-ink-2">
+                  <span>Efectivo inicial</span>
+                  <span className="font-semibold text-ink">{formatoMoneda(caja.monto_apertura)}</span>
                 </div>
-                <div>
-                  <h2 className="text-base font-bold text-white">Caja Cerrada — Turno Completado</h2>
-                  <p className="text-xs text-slate-400">
-                    Fecha: {new Date(caja.fecha).toLocaleDateString("es-EC")}
-                  </p>
-                </div>
-              </div>
+                <Field label="Efectivo contado al cerrar" hint="Se compara con lo que debería haber según los movimientos de hoy.">
+                  <Input type="number" min={0} step="0.01" required value={montoCaja} onChange={(e) => setMontoCaja(e.target.value)} />
+                </Field>
+                <Button type="submit" variant="secondary" className="w-full" disabled={guardando}>
+                  Cerrar caja
+                </Button>
+              </form>
+            )}
 
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase">Apertura:</span>
-                  <p className="text-sm font-mono font-bold text-slate-200">
-                    {formatoMoneda(caja.monto_apertura)}
-                  </p>
+            {caja?.cerrada && (
+              <dl className="space-y-2">
+                {[
+                  { label: "Efectivo inicial", valor: caja.monto_apertura },
+                  { label: "Debía haber", valor: caja.monto_cierre_esperado },
+                  { label: "Se contó", valor: caja.monto_cierre_real },
+                ].map((f) => (
+                  <div key={f.label} className="flex justify-between text-ink-2">
+                    <dt>{f.label}</dt>
+                    <dd className="font-semibold text-ink">{formatoMoneda(f.valor)}</dd>
+                  </div>
+                ))}
+                <div className={cn("flex justify-between border-t border-line pt-3 font-semibold", (caja.diferencia ?? 0) === 0 ? "text-ok" : "text-bad")}>
+                  <dt>{(caja.diferencia ?? 0) === 0 ? "Caja cuadrada" : (caja.diferencia ?? 0) > 0 ? "Sobrante" : "Faltante"}</dt>
+                  <dd>{formatoMoneda(Math.abs(caja.diferencia ?? 0))}</dd>
                 </div>
+              </dl>
+            )}
+          </div>
+        </Card>
+      </div>
 
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase">Esperado al Cierre:</span>
-                  <p className="text-sm font-mono font-bold text-slate-200">
-                    {formatoMoneda(caja.monto_cierre_esperado ?? 0)}
-                  </p>
-                </div>
+      <Modal open={modal === "ingresos"} onClose={() => setModal(null)} title="Registrar ingreso" description="Para dinero que no viene del cobro de una orden." width="max-w-md">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            guardar(
+              () => api.post("/api/financiero/ingresos", { concepto: formIngreso.concepto.trim(), monto: Number(formIngreso.monto), metodo_pago: formIngreso.metodo_pago }),
+              () => {
+                setFormIngreso({ concepto: "", monto: "", metodo_pago: "efectivo" });
+                setModal(null);
+                setTab("ingresos");
+              },
+            );
+          }}
+        >
+          <Field label="Concepto">
+            <Input required autoFocus value={formIngreso.concepto} onChange={(e) => setFormIngreso((f) => ({ ...f, concepto: e.target.value }))} placeholder="Venta de chatarra" />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Monto">
+              <Input type="number" min={0.01} step="0.01" required value={formIngreso.monto} onChange={(e) => setFormIngreso((f) => ({ ...f, monto: e.target.value }))} />
+            </Field>
+            <Field label="Forma de pago">
+              <Select value={formIngreso.metodo_pago} onChange={(e) => setFormIngreso((f) => ({ ...f, metodo_pago: e.target.value }))}>
+                {METODOS}
+              </Select>
+            </Field>
+          </div>
+          {errorForm && <Alert>{errorForm}</Alert>}
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
+            <Button type="button" variant="ghost" onClick={() => setModal(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={guardando}>
+              Registrar ingreso
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase">Real en Gaveta:</span>
-                  <p className="text-sm font-mono font-bold text-slate-200">
-                    {formatoMoneda(caja.monto_cierre_real ?? 0)}
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase">Diferencia:</span>
-                  <p
-                    className={`text-sm font-mono font-bold ${
-                      Number(caja.diferencia) === 0
-                        ? "text-emerald-400"
-                        : Number(caja.diferencia) > 0
-                        ? "text-blue-400"
-                        : "text-rose-400"
-                    }`}
-                  >
-                    {formatoMoneda(caja.diferencia ?? 0)}
-                  </p>
-                </div>
-              </div>
-
-              {Number(caja.diferencia) === 0 ? (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Arqueo perfecto: No hay diferencias entre el saldo esperado y el efectivo real.</span>
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Se detectó una discrepancia en el conteo de efectivo al cierre.</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+      <Modal open={modal === "egresos"} onClose={() => setModal(null)} title="Registrar egreso" width="max-w-md">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            guardar(
+              () => api.post("/api/financiero/egresos", { ...formEgreso, descripcion: formEgreso.descripcion.trim(), monto: Number(formEgreso.monto) }),
+              () => {
+                setFormEgreso({ categoria: "repuestos", descripcion: "", monto: "", metodo_pago: "efectivo" });
+                setModal(null);
+                setTab("egresos");
+              },
+            );
+          }}
+        >
+          <Field label="Categoría">
+            <Select value={formEgreso.categoria} onChange={(e) => setFormEgreso((f) => ({ ...f, categoria: e.target.value }))}>
+              {CATEGORIAS_EGRESO.map((c) => (
+                <option key={c} value={c}>
+                  {nombreCategoria(c)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Descripción">
+            <Input required autoFocus value={formEgreso.descripcion} onChange={(e) => setFormEgreso((f) => ({ ...f, descripcion: e.target.value }))} placeholder="Compra de filtros a proveedor" />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Monto">
+              <Input type="number" min={0.01} step="0.01" required value={formEgreso.monto} onChange={(e) => setFormEgreso((f) => ({ ...f, monto: e.target.value }))} />
+            </Field>
+            <Field label="Forma de pago">
+              <Select value={formEgreso.metodo_pago} onChange={(e) => setFormEgreso((f) => ({ ...f, metodo_pago: e.target.value }))}>
+                {METODOS}
+              </Select>
+            </Field>
+          </div>
+          {errorForm && <Alert>{errorForm}</Alert>}
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
+            <Button type="button" variant="ghost" onClick={() => setModal(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={guardando}>
+              Registrar egreso
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

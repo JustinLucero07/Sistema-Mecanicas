@@ -8,10 +8,8 @@ Plataforma SaaS profesional, moderna y escalable para la gestión operativa y fi
 
 - **Arquitectura SaaS Multi-Tenant Nativa**: Aislamiento estricto de datos por organización (`organization_id`) y soporte para múltiples sucursales (`sucursales`).
 - **Ficha Clínica del Vehículo & Línea de Tiempo (Timeline)**: Registro inmutable de intervenciones mecánicas, kilometraje, diagnósticos, repuestos reemplazados, mecánicos asignados y costos.
-- **Reconocimiento Inteligente de Placas**:
-  - *On-Device*: Reconocimiento en el teléfono (< 300 ms) sin costos de servidor y 100% offline.
-  - *Fallback Servidor*: Inferencia asistida por visión artificial (YOLOv8-nano + OCR) con normalización y confirmación editable.
-- **Órdenes de Trabajo (Workflow)**: Estados de reparación (Recepción, Diagnóstico, En Reparación, Control de Calidad, Entregado, Cancelado), desglose de mano de obra y repuestos, firmas digitales y control de saldos.
+- **Identificación por placa**: la app envía la foto al servidor, que detecta la placa (YOLO) y la lee (OCR). La placa leída siempre se muestra para confirmarla o corregirla antes de buscar. **Pendiente:** el modelo YOLO aún no está entrenado ni instalado (`PLATE_MODEL_PATH`); hasta entonces la lectura por foto responde 503 y la placa se escribe a mano. No hay reconocimiento en el teléfono.
+- **Órdenes de Trabajo (Workflow)**: Estados de reparación (Recepción, Diagnóstico, Esperando aprobación, Esperando repuestos, En reparación, Control de calidad, Listo para entregar, Entregado, Cancelado), desglose de mano de obra y repuestos, y control de saldos. La firma digital tiene campo en la base de datos pero aún no tiene pantalla.
 - **Recepción 360° & Checklist Visual**: Nivel de combustible, accesorios (gato, herramientas, llanta de emergencia) y notas de daños visibles.
 - **Inventario y Kardex Automatizado**: Repuestos con SKU, código de barras, stock mínimo, precio y deducción automática de existencias al utilizarse en órdenes de trabajo.
 - **Finanzas y Caja Diaria**: Ingresos, abonos parciales, egresos por categorías, cuadre de caja diaria y balances de rentabilidad mensual.
@@ -60,6 +58,8 @@ docker compose up -d db minio
 
 ```bash
 cd backend
+# Requiere Python 3.12 (con 3.14 no compilan las dependencias).
+# Si el sistema no lo trae: uv venv --python 3.12 .venv
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install pytest httpx
@@ -93,8 +93,8 @@ npm run dev   # Disponible en http://localhost:3000
 ```bash
 cd mobile
 flutter pub get
-flutter run --dart-define=API_URL=http://10.0.2.2:8000   # Emulador Android
-# O en dispositivo físico: --dart-define=API_URL=http://TU_IP_LOCAL:8000
+flutter run --dart-define=API_URL=http://10.0.2.2:8001   # Emulador Android
+# O en dispositivo físico: --dart-define=API_URL=http://TU_IP_LOCAL:8001
 ```
 
 ---

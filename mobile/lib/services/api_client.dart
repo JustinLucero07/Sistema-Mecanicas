@@ -1,17 +1,14 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Cambia esto por la URL de tu backend en la VPS al pasar a producción.
-/// 10.0.2.2 es el alias del emulador Android hacia el "localhost" de la
-/// máquina host; en un dispositivo físico usa la IP de tu backend.
+/// URL del backend. En producción se pasa con `--dart-define=API_URL=...`.
+/// 10.0.2.2 es el alias del emulador Android hacia el localhost de la PC.
 String get kApiBaseUrl {
   const envUrl = String.fromEnvironment('API_URL');
   if (envUrl.isNotEmpty) return envUrl;
-  try {
-    if (Platform.isAndroid) return 'http://10.0.2.2:8001';
-  } catch (_) {}
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8001';
   return 'http://localhost:8001';
 }
 
@@ -23,14 +20,17 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-class ApiClient {
-  Future<String?> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
+/// Mensaje legible para mostrar a la persona, sea cual sea el error.
+String mensajeError(Object e, String porDefecto) {
+  if (e is ApiException) return e.message;
+  if (e is http.ClientException) return 'Sin conexión con el servidor. Revisa el wifi o los datos.';
+  return porDefecto;
+}
 
+class ApiClient {
   Future<Map<String, String>> _headers({bool json = true}) async {
-    final token = await _token();
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
     return {
       if (json) 'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
@@ -50,36 +50,24 @@ class ApiClient {
     throw ApiException(res.statusCode, detail);
   }
 
-  Future<dynamic> get(String path) async {
-    final res = await http.get(Uri.parse('$kApiBaseUrl$path'), headers: await _headers());
-    return _decode(res);
-  }
+  Uri _uri(String path) => Uri.parse('$kApiBaseUrl$path');
 
-  Future<dynamic> post(String path, [Map<String, dynamic>? body]) async {
-    final res = await http.post(
-      Uri.parse('$kApiBaseUrl$path'),
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _decode(res);
-  }
+  Future<dynamic> get(String path) async => _decode(await http.get(_uri(path), headers: await _headers()));
 
-  Future<dynamic> patch(String path, [Map<String, dynamic>? body]) async {
-    final res = await http.patch(
-      Uri.parse('$kApiBaseUrl$path'),
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _decode(res);
-  }
+  Future<dynamic> post(String path, [Map<String, dynamic>? body]) async =>
+      _decode(await http.post(_uri(path), headers: await _headers(), body: body != null ? jsonEncode(body) : null));
 
-  Future<dynamic> postFile(String path, File file, {String field = 'foto'}) async {
-    final request = http.MultipartRequest('POST', Uri.parse('$kApiBaseUrl$path'));
+  Future<dynamic> patch(String path, [Map<String, dynamic>? body]) async =>
+      _decode(await http.patch(_uri(path), headers: await _headers(), body: body != null ? jsonEncode(body) : null));
+
+  /// Sube una foto como multipart. Recibe bytes para funcionar igual en
+  /// Android, iOS y web.
+  Future<dynamic> postFoto(String path, Uint8List bytes, {Map<String, String> campos = const {}}) async {
+    final request = http.MultipartRequest('POST', _uri(path));
     request.headers.addAll(await _headers(json: false));
-    request.files.add(await http.MultipartFile.fromPath(field, file.path));
-    final streamed = await request.send();
-    final res = await http.Response.fromStream(streamed);
-    return _decode(res);
+    request.fields.addAll(campos);
+    request.files.add(http.MultipartFile.fromBytes('foto', bytes, filename: 'foto.jpg'));
+    return _decode(await http.Response.fromStream(await request.send()));
   }
 }
 

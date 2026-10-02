@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
 import '../utils/format.dart';
+import '../widgets.dart';
+import 'orden_detalle_screen.dart';
+import 'recepcion_sheet.dart';
 
+/// Ficha del vehículo: datos clave e historial completo de visitas.
 class VehiculoDetalleScreen extends StatefulWidget {
   final int vehiculoId;
   const VehiculoDetalleScreen({super.key, required this.vehiculoId});
@@ -13,9 +19,8 @@ class VehiculoDetalleScreen extends StatefulWidget {
 
 class _VehiculoDetalleScreenState extends State<VehiculoDetalleScreen> {
   Vehiculo? _vehiculo;
-  List<TimelineEvento> _timeline = [];
+  List<TimelineEvento>? _timeline;
   String? _error;
-  bool _cargando = true;
 
   @override
   void initState() {
@@ -24,438 +29,142 @@ class _VehiculoDetalleScreenState extends State<VehiculoDetalleScreen> {
   }
 
   Future<void> _cargar() async {
-    setState(() => _cargando = true);
     try {
       final v = await apiClient.get('/api/vehiculos/${widget.vehiculoId}');
-      final timelineData = await apiClient.get('/api/vehiculos/${widget.vehiculoId}/timeline').catchError((_) => []);
+      final t = await apiClient.get('/api/vehiculos/${widget.vehiculoId}/timeline') as List;
       if (!mounted) return;
       setState(() {
         _vehiculo = Vehiculo.fromJson(v);
-        if (timelineData is List) {
-          _timeline = timelineData.map((e) => TimelineEvento.fromJson(e)).toList();
-        }
+        _timeline = t.map((e) => TimelineEvento.fromJson(e)).toList();
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e is ApiException ? e.message : 'Error al cargar datos del vehículo');
-    } finally {
-      if (mounted) setState(() => _cargando = false);
+      if (mounted) setState(() => _error = mensajeError(e, 'No se pudo cargar el vehículo.'));
     }
   }
 
-  Future<void> _agregarOrden() async {
-    final resultado = await showModalBottomSheet<bool>(
+  Future<void> _abrirOrden(int ordenId) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => OrdenDetalleScreen(ordenId: ordenId)));
+    _cargar();
+  }
+
+  Future<void> _nuevaOrden() async {
+    final ordenId = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _NuevaOrdenSheet(vehiculo: _vehiculo!),
+      useSafeArea: true,
+      builder: (_) => RecepcionSheet(vehiculo: _vehiculo!),
     );
-    if (resultado == true) _cargar();
+    if (ordenId != null && mounted) _abrirOrden(ordenId);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (_error != null) {
+    final c = context.c;
+    final v = _vehiculo;
+    if (v == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!))),
+        body: _error != null ? Padding(padding: const EdgeInsets.all(16), child: Aviso(_error!)) : const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_vehiculo == null || _cargando) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFF97316))));
-    }
-
-    final v = _vehiculo!;
+    final timeline = _timeline ?? [];
+    final ultima = timeline.isNotEmpty ? timeline.first : null;
+    final telefono = (v.cliente?.whatsapp ?? v.cliente?.telefono ?? '').replaceAll(RegExp(r'\D'), '');
+    final faltan = v.proximoMantenimientoKm != null && v.kilometrajeActual != null ? v.proximoMantenimientoKm! - v.kilometrajeActual! : null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(v.placa),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _cargar,
-          ),
+          if (telefono.isNotEmpty)
+            IconButton(
+              tooltip: 'Escribir por WhatsApp',
+              icon: const Icon(Icons.chat_outlined),
+              onPressed: () => launchUrl(Uri.parse('https://wa.me/$telefono'), mode: LaunchMode.externalApplication),
+            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton.icon(
-            onPressed: _agregarOrden,
-            icon: const Icon(Icons.flash_on_rounded),
-            label: const Text('Crear Nueva Orden de Trabajo'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 4,
-            ),
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(onPressed: _nuevaOrden, icon: const Icon(Icons.add), label: const Text('Nueva orden de trabajo')),
         ),
       ),
       body: RefreshIndicator(
         onRefresh: _cargar,
-        color: const Color(0xFFF97316),
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           children: [
-            // Cockpit Card: Placa Metálica y Ficha Técnica
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Chapa Metálica de Placa
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFFFFF), Color(0xFFE2E8F0)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF334155), width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            v.placa,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: v.estado == 'en_taller'
-                                ? Colors.orange.withValues(alpha: 0.15)
-                                : Colors.green.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            v.estado == 'en_taller' ? 'EN TALLER' : 'ACTIVO',
-                            style: TextStyle(
-                              color: v.estado == 'en_taller' ? Colors.orange : Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      v.descripcionCorta.isEmpty ? 'Vehículo sin marca/modelo' : v.descripcionCorta,
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Propietario: ${v.cliente?.nombre ?? "Sin asignar"}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white70 : const Color(0xFF475569),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    if (v.kilometrajeActual != null) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.speed_rounded, size: 16, color: Color(0xFFF97316)),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Odómetro: ${v.kilometrajeActual} km',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+            Align(alignment: Alignment.centerLeft, child: PlateBadge(v.placa, scale: 1.7)),
+            const SizedBox(height: 14),
+            Text(v.nombre, style: displayStyle(context, size: 34)),
+            const SizedBox(height: 4),
+            Text(v.cliente?.nombreCompleto ?? 'Sin cliente', style: TextStyle(color: c.ink2, fontSize: 16)),
+            if (v.enTaller || (faltan != null && faltan <= 1000)) ...[
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                if (v.enTaller) const Etiqueta('En el taller', tono: Tono.brand),
+                if (faltan != null && faltan <= 1000)
+                  Etiqueta(faltan <= 0 ? 'Mantenimiento vencido' : 'Mantenimiento en ${formatoKm(faltan)}', tono: Tono.warn),
+              ]),
+            ],
+            const SizedBox(height: 18),
+            Panel(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Dato('Kilometraje', formatoKm(v.kilometrajeActual))),
+                  Expanded(child: Dato('Última visita', ultima != null ? formatoFecha(ultima.fecha) : 'Sin visitas')),
+                ],
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // Encabezado Historial Clínico
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Historial Clínico Automotriz',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  '${_timeline.length} intervenciones',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
+            const SizedBox(height: 26),
+            Text('Historial', style: displayStyle(context, size: 24)),
             const SizedBox(height: 10),
-
-            if (_timeline.isEmpty) ...[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Icon(Icons.history_rounded, size: 40, color: Colors.grey.withValues(alpha: 0.5)),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Sin intervenciones registradas',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Crea una nueva orden de trabajo con el botón inferior.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ] else ...[
-              ..._timeline.map((evento) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
+            if (timeline.isEmpty)
+              const Vacio(
+                icono: Icons.history,
+                titulo: 'Este vehículo aún no tiene historial',
+                descripcion: 'Cada orden quedará aquí con su kilometraje, repuestos y costo.',
+              )
+            else
+              for (final ev in timeline)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Panel(
+                    onTap: () => _abrirOrden(ev.ordenId),
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              evento.numeroOrden != null ? 'OT #${evento.numeroOrden}' : 'Orden #${evento.ordenId}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                            ),
-                            Text(
-                              formatoMoneda(evento.costoTotal),
-                              style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 14),
-                            ),
+                            Expanded(child: Text('${formatoFecha(ev.fecha)} · ${formatoKm(ev.kilometraje)}', style: TextStyle(color: c.ink3, fontSize: 14))),
+                            Text(formatoMoneda(ev.costoTotal), style: const TextStyle(fontFamily: kDisplayFont, fontSize: 20, fontWeight: FontWeight.w600)),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          evento.fecha.length >= 10 ? evento.fecha.substring(0, 10) : evento.fecha,
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                        if (evento.motivo != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Motivo: ${evento.motivo}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                        if (evento.diagnostico != null) ...[
+                        const SizedBox(height: 4),
+                        Text(ev.motivo?.isNotEmpty == true ? ev.motivo! : 'Orden de trabajo', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        if (ev.diagnostico?.isNotEmpty == true) ...[
                           const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Diagnóstico: ${evento.diagnostico}',
-                              style: const TextStyle(fontSize: 11, color: Colors.amber),
-                            ),
-                          ),
+                          Text(ev.diagnostico!, style: TextStyle(color: c.ink2, fontSize: 15)),
                         ],
-                        if (evento.repuestosUtilizados.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: evento.repuestosUtilizados.map((rep) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.blueGrey.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '🔧 $rep',
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                        if (ev.repuestos.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text('Repuestos: ${ev.repuestos.join(", ")}', style: TextStyle(color: c.ink3, fontSize: 14)),
                         ],
+                        const SizedBox(height: 10),
+                        Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          EtiquetaEstado(ev.estado),
+                          Text(ev.mecanicoNombre ?? 'Sin mecánico', style: TextStyle(color: c.ink3, fontSize: 13)),
+                        ]),
                       ],
                     ),
                   ),
-                );
-              }),
-            ],
+                ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NuevaOrdenSheet extends StatefulWidget {
-  final Vehiculo vehiculo;
-  const _NuevaOrdenSheet({required this.vehiculo});
-
-  @override
-  State<_NuevaOrdenSheet> createState() => _NuevaOrdenSheetState();
-}
-
-class _NuevaOrdenSheetState extends State<_NuevaOrdenSheet> {
-  final _motivoCtrl = TextEditingController();
-  final _kmCtrl = TextEditingController();
-  double _combustible = 50;
-  bool _guardando = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.vehiculo.kilometrajeActual != null) {
-      _kmCtrl.text = widget.vehiculo.kilometrajeActual.toString();
-    }
-  }
-
-  Future<void> _guardar() async {
-    if (_motivoCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Ingresa el motivo de ingreso');
-      return;
-    }
-
-    setState(() {
-      _guardando = true;
-      _error = null;
-    });
-
-    try {
-      await apiClient.post('/api/ordenes', {
-        'vehiculo_id': widget.vehiculo.id,
-        'motivo_ingreso': _motivoCtrl.text.trim(),
-        'kilometraje_ingreso': int.tryParse(_kmCtrl.text),
-        'checklist': {
-          'nivel_combustible': _combustible.toInt(),
-          'radio': true,
-          'herramientas': true,
-          'gato_palanca': true,
-          'llanta_emergencia': true,
-        },
-        'detalles': [
-          {
-            'tipo': 'mano_obra',
-            'descripcion': 'Revisión y diagnóstico inicial',
-            'cantidad': 1,
-            'precio_unitario': 20.0,
-          }
-        ],
-      });
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      setState(() => _error = e is ApiException ? e.message : 'Error al registrar orden');
-    } finally {
-      if (mounted) setState(() => _guardando = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131B2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Nueva Orden: ${widget.vehiculo.placa}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _motivoCtrl,
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: 'Motivo de Ingreso / Falla Reportada *',
-              hintText: 'Ej: Fuga de refrigerante, vibración al frenar...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _kmCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Kilometraje de Entrada (km)',
-              prefixIcon: const Icon(Icons.speed_rounded),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Nivel de Gasolina:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              Text('${_combustible.toInt()}%', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF97316))),
-            ],
-          ),
-          Slider(
-            value: _combustible,
-            min: 0,
-            max: 100,
-            divisions: 20,
-            activeColor: const Color(0xFFF97316),
-            onChanged: (val) => setState(() => _combustible = val),
-          ),
-          if (_error != null) ...[
-            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-            const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: _guardando ? null : _guardar,
-            child: _guardando
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Registrar Entrada al Taller'),
-          ),
-        ],
       ),
     );
   }

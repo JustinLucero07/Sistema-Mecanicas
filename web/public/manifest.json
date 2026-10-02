@@ -1,13 +1,21 @@
 {
-  "name": "Taller Mecánica",
-  "short_name": "Taller",
-  "description": "Gestión de vehículos, mantenimiento e ingresos/egresos del taller",
+  "name": "MecánicaOS",
+  "short_name": "MecánicaOS",
+  "description": "Gestión de taller mecánico: vehículos, órdenes de trabajo, inventario y caja.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#0f172a",
+  "background_color": "#f2f3f0",
+  "theme_color": "#0b6b6b",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

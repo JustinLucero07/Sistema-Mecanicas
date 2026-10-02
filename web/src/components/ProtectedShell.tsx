@@ -4,268 +4,196 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard,
-  Car,
+  Boxes,
+  CarFront,
+  ClipboardList,
+  LayoutGrid,
+  LogOut,
+  Menu,
+  Moon,
+  ScanLine,
+  Search,
+  Sun,
   Users,
   Wallet,
-  Package,
-  Camera,
-  LogOut,
-  Search,
-  Bell,
-  Wrench,
-  ChevronDown,
-  Building2,
-  Menu,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
+import { etiqueta } from "@/lib/format";
+import type { Rol } from "@/lib/types";
 import ScannerModal from "@/components/ScannerModal";
-import ThemeToggle from "@/components/ThemeToggle";
+import { Button, cn } from "@/components/ui";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/vehiculos", label: "Vehículos & Historial", icon: Car },
-  { href: "/clientes", label: "Clientes CRM", icon: Users },
-  { href: "/inventario", label: "Repuestos & Kardex", icon: Package },
-  { href: "/financiero", label: "Finanzas & Caja", icon: Wallet },
+const ROLES_FINANZAS: Rol[] = ["superadmin", "admin_taller", "admin", "gerente", "contabilidad", "cajero"];
+
+const NAV: { href: string; label: string; icon: LucideIcon; roles?: Rol[] }[] = [
+  { href: "/dashboard", label: "Taller", icon: LayoutGrid },
+  { href: "/ordenes", label: "Órdenes", icon: ClipboardList },
+  { href: "/vehiculos", label: "Vehículos", icon: CarFront },
+  { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/inventario", label: "Inventario", icon: Boxes },
+  { href: "/financiero", label: "Caja y finanzas", icon: Wallet, roles: ROLES_FINANZAS },
 ];
+
+export function puedeVerFinanzas(rol: Rol | undefined): boolean {
+  return !!rol && ROLES_FINANZAS.includes(rol);
+}
+
+function Marca() {
+  return (
+    <Link href="/dashboard" className="flex items-center gap-2.5">
+      <span className="grid size-8 place-items-center rounded-lg bg-brand font-display text-lg font-bold leading-none text-brand-ink">
+        M
+      </span>
+      <span className="font-display text-[1.35rem] font-semibold leading-none tracking-tight text-ink">MecánicaOS</span>
+    </Link>
+  );
+}
 
 export default function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { sesion, cargando, logout } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [busquedaRapida, setBusquedaRapida] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
-    if (!cargando && !sesion) {
-      router.replace("/login");
-    }
+    if (!cargando && !sesion) router.replace("/login");
   }, [cargando, sesion, router]);
 
-  // Atajo de teclado global Ctrl+K para buscar placa
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        const searchInput = document.getElementById("quick-plate-search");
-        if (searchInput) searchInput.focus();
+        document.getElementById("busqueda-global")?.focus();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  function handleBusqueda(e: React.FormEvent) {
-    e.preventDefault();
-    if (busquedaRapida.trim()) {
-      router.push(`/vehiculos?q=${encodeURIComponent(busquedaRapida.trim())}`);
-    }
+  if (cargando || !sesion) {
+    return <div className="grid min-h-screen place-items-center text-ink-3">Cargando…</div>;
   }
 
-  if (cargando || !sesion) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0b0f19] text-slate-400">
-        <div className="flex flex-col items-center gap-3">
-          <Wrench className="w-8 h-8 text-orange-500 animate-spin" />
-          <span className="text-xs font-mono tracking-wider text-slate-500">CARGANDO MECÁNICAOS...</span>
-        </div>
-      </div>
-    );
+  const items = NAV.filter((item) => !item.roles || item.roles.includes(sesion.rol));
+
+  function onBuscar(e: React.FormEvent) {
+    e.preventDefault();
+    const q = busqueda.trim();
+    if (q) router.push(`/vehiculos?q=${encodeURIComponent(q)}`);
   }
+
+  const navegacion = (
+    <nav className="flex flex-col gap-0.5" aria-label="Secciones">
+      {items.map(({ href, label, icon: Icon }) => {
+        const activo = pathname?.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={() => setMenuOpen(false)}
+            aria-current={activo ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 font-medium transition-colors",
+              activo ? "bg-brand-soft text-brand-text" : "text-ink-2 hover:bg-raised hover:text-ink",
+            )}
+          >
+            <Icon className="size-[1.15rem]" aria-hidden />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  const pieUsuario = (
+    <div className="flex items-center gap-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-raised text-[0.87rem] font-semibold text-ink-2">
+        {sesion.nombre.slice(0, 2).toUpperCase()}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[0.93rem] font-semibold text-ink">{sesion.nombre}</p>
+        <p className="truncate text-[0.8rem] text-ink-3">{etiqueta(sesion.rol)}</p>
+      </div>
+      <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión" className="rounded-lg p-2 text-ink-3 hover:bg-raised hover:text-bad">
+        <LogOut className="size-[1.15rem]" />
+      </button>
+    </div>
+  );
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors">
-      {/* Sidebar Desktop */}
-      <aside className="hidden lg:flex lg:w-64 flex-col justify-between shrink-0 glass-panel border-r border-slate-200 dark:border-slate-800/80 z-20">
-        <div className="flex flex-col h-full">
-          {/* Brand Header */}
-          <div className="p-5 border-b border-slate-200 dark:border-slate-800/80">
-            <Link href="/dashboard" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
-                <Wrench className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-base font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                  MecánicaOS
-                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30">
-                    PRO
-                  </span>
-                </h1>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Gestión Integral Automotriz</p>
-              </div>
-            </Link>
-
-            {/* Tenant Badge */}
-            <div className="mt-4 p-2 rounded-xl bg-slate-100/80 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <Building2 className="w-3.5 h-3.5 text-orange-500 dark:text-orange-400 shrink-0" />
-                <div className="truncate">
-                  <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">Taller Central</p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Matriz Norte</p>
-                </div>
-              </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-            </div>
-          </div>
-
-          {/* Nav Items */}
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Módulos Principales
-            </div>
-            {NAV_ITEMS.map((item) => {
-              const active = pathname?.startsWith(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                    active
-                      ? "bg-orange-500/10 dark:bg-gradient-to-r dark:from-orange-500/15 dark:to-transparent text-orange-600 dark:text-orange-400 border-l-2 border-orange-500 font-semibold"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/60"
-                  }`}
-                >
-                  <Icon
-                    className={`w-4 h-4 transition-colors ${
-                      active ? "text-orange-600 dark:text-orange-400" : "text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200"
-                    }`}
-                  />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Quick Scanner Action in Sidebar */}
-          <div className="p-3 border-t border-slate-200 dark:border-slate-800/80">
-            <button
-              onClick={() => setScannerOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-98 cursor-pointer"
-            >
-              <Camera className="w-4 h-4" />
-              Escanear Placa (LPR)
-            </button>
-          </div>
-
-          {/* User Profile Footer */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 bg-slate-100/50 dark:bg-slate-950/40 flex items-center justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200">
-                {sesion.nombre.slice(0, 2).toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{sesion.nombre}</p>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                  {sesion.rol}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={logout}
-              title="Cerrar sesión"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+    <div className="flex min-h-screen">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+        <div className="px-5 py-5">
+          <Marca />
+        </div>
+        <div className="flex-1 overflow-y-auto px-3">{navegacion}</div>
+        <div className="space-y-4 border-t border-line p-4">
+          <Button icon={ScanLine} className="w-full" onClick={() => setScannerOpen(true)}>
+            Escanear placa
+          </Button>
+          {pieUsuario}
         </div>
       </aside>
 
-      {/* Main Content Shell */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar Glass */}
-        <header className="sticky top-0 z-30 h-16 glass-panel border-b border-slate-200 dark:border-slate-800/80 px-4 md:px-8 flex items-center justify-between gap-4">
-          {/* Mobile menu trigger */}
-          <div className="flex items-center gap-3 lg:hidden">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-            <span className="font-bold text-sm text-slate-900 dark:text-white">MecánicaOS</span>
-          </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-canvas/90 px-4 backdrop-blur md:px-8">
+          <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="rounded-lg p-2 text-ink-2 hover:bg-raised lg:hidden">
+            <Menu className="size-5" />
+          </button>
 
-          {/* Global Quick Plate Search */}
-          <form onSubmit={handleBusqueda} className="hidden sm:flex items-center flex-1 max-w-md relative">
-            <Search className="w-4 h-4 absolute left-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
+          <form onSubmit={onBuscar} role="search" className="relative max-w-md flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
             <input
-              id="quick-plate-search"
-              type="text"
-              value={busquedaRapida}
-              onChange={(e) => setBusquedaRapida(e.target.value)}
-              placeholder="Buscar por placa, VIN o cliente... (Ctrl + K)"
-              className="w-full rounded-xl bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 pl-9 pr-14 py-2 text-xs font-mono text-slate-900 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-orange-500/80 focus:ring-1 focus:ring-orange-500/30 shadow-xs"
+              id="busqueda-global"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar placa, VIN o cliente"
+              aria-label="Buscar placa, VIN o cliente"
+              className="h-9 w-full rounded-lg border border-line bg-surface pr-14 pl-9 text-[0.93rem] placeholder:text-ink-3 focus:border-brand focus:ring-2 focus:ring-brand/25 focus:outline-none"
             />
-            <kbd className="absolute right-2.5 text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-              ↵
+            <kbd className="pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 rounded border border-line px-1.5 font-sans text-[0.75rem] text-ink-3 sm:block">
+              Ctrl K
             </kbd>
           </form>
 
-          {/* Top Actions */}
-          <div className="flex items-center gap-2.5">
-            {/* Theme Mode Toggle */}
-            <ThemeToggle />
-
-            <button
-              onClick={() => setScannerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 text-xs font-semibold transition-all cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Escanear Placa</span>
-            </button>
-
-            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
-
-            <button
-              title="Notificaciones de taller"
-              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 relative transition-colors"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-orange-500" />
-            </button>
-          </div>
+          <button
+            onClick={toggleTheme}
+            aria-label={resolvedTheme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+            title={resolvedTheme === "dark" ? "Tema claro" : "Tema oscuro"}
+            className="rounded-lg p-2 text-ink-2 hover:bg-raised hover:text-ink"
+          >
+            {resolvedTheme === "dark" ? <Sun className="size-[1.15rem]" /> : <Moon className="size-[1.15rem]" />}
+          </button>
+          <Button size="sm" icon={ScanLine} className="lg:hidden" onClick={() => setScannerOpen(true)}>
+            Escanear
+          </Button>
         </header>
 
-        {/* Mobile Navigation Drawer */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden p-4 glass-panel border-b border-slate-800 space-y-2 animate-in slide-in-from-top duration-200">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
-                  pathname?.startsWith(item.href)
-                    ? "bg-orange-500/20 text-orange-400 font-semibold"
-                    : "text-slate-300 hover:bg-slate-900"
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </Link>
-            ))}
-            <button
-              onClick={logout}
-              className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" /> Cerrar sesión
-            </button>
-          </div>
-        )}
-
-        {/* Dynamic Page Content */}
-        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-in fade-in duration-300">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-[84rem] flex-1 space-y-7 px-4 py-7 md:px-8">{children}</main>
       </div>
 
-      {/* Global Plate Scanner Modal */}
-      <ScannerModal isOpen={scannerOpen} onClose={() => setScannerOpen(false)} />
+      {menuOpen && (
+        <div className="overlay-in fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuOpen(false)}>
+          <div className="flex h-full w-72 max-w-[85vw] flex-col bg-surface" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4">
+              <Marca />
+              <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="rounded-lg p-2 text-ink-3 hover:bg-raised">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3">{navegacion}</div>
+            <div className="border-t border-line p-4">{pieUsuario}</div>
+          </div>
+        </div>
+      )}
+
+      <ScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} />
     </div>
   );
 }

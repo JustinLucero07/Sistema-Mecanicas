@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../theme.dart';
+import '../widgets.dart';
 
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
@@ -10,7 +12,7 @@ class ClientesScreen extends StatefulWidget {
 }
 
 class _ClientesScreenState extends State<ClientesScreen> {
-  List<Cliente> _clientes = [];
+  List<Cliente>? _clientes;
   String? _error;
 
   @override
@@ -21,130 +23,160 @@ class _ClientesScreenState extends State<ClientesScreen> {
 
   Future<void> _cargar() async {
     try {
-      final data = await apiClient.get('/api/clientes');
-      setState(() => _clientes = (data as List).map((c) => Cliente.fromJson(c)).toList());
+      final data = await apiClient.get('/api/clientes') as List;
+      if (!mounted) return;
+      setState(() {
+        _clientes = data.map((c) => Cliente.fromJson(c)).toList();
+        _error = null;
+      });
     } catch (e) {
-      setState(() => _error = e is ApiException ? e.message : 'Error al cargar clientes');
+      if (mounted) setState(() => _error = mensajeError(e, 'No se pudieron cargar los clientes.'));
     }
   }
 
-  Future<void> _nuevoCliente() async {
-    final creado = await showModalBottomSheet<bool>(
+  Future<void> _nuevo() async {
+    final creado = await showModalBottomSheet<Cliente>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const _NuevoClienteSheet(),
+      useSafeArea: true,
+      builder: (_) => const NuevoClienteSheet(),
     );
-    if (creado == true) _cargar();
+    if (creado != null) _cargar();
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.c;
+    final lista = _clientes ?? [];
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Clientes CRM'),
+        title: const Text('Clientes'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_rounded),
-            tooltip: 'Nuevo Cliente',
-            onPressed: _nuevoCliente,
-          ),
+          TextButton.icon(onPressed: _nuevo, icon: const Icon(Icons.add), label: const Text('Nuevo')),
+          const SizedBox(width: 8),
         ],
       ),
       body: _error != null
-          ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
-          : _clientes.isEmpty
-              ? const Center(child: Text('No hay clientes registrados todavía.'))
-              : ListView.separated(
-                  itemCount: _clientes.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final c = _clientes[i];
-                    return ListTile(
-                      title: Text(c.nombre),
-                      subtitle: Text([c.telefono, c.email].where((e) => e != null && e.isNotEmpty).join(' · ')),
-                    );
-                  },
+          ? Padding(padding: const EdgeInsets.all(16), child: Aviso(_error!))
+          : _clientes == null
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _cargar,
+                  child: lista.isEmpty
+                      ? ListView(children: [
+                          Vacio(
+                            icono: Icons.people_outline,
+                            titulo: 'Aún no hay clientes',
+                            descripcion: 'Crea el primero para poder registrar su vehículo.',
+                            accion: FilledButton(onPressed: _nuevo, child: const Text('Nuevo cliente')),
+                          ),
+                        ])
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                          itemCount: lista.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final cl = lista[i];
+                            final contacto = [cl.telefono, cl.cedulaRuc].where((e) => e != null && e.isNotEmpty).join(' · ');
+                            return Panel(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(children: [
+                                CircleAvatar(
+                                  backgroundColor: c.raised,
+                                  child: Text(cl.nombre.isEmpty ? '?' : cl.nombre[0].toUpperCase(), style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(cl.nombreCompleto, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                    if (contacto.isNotEmpty) Text(contacto, style: TextStyle(color: c.ink3, fontSize: 14)),
+                                  ]),
+                                ),
+                              ]),
+                            );
+                          },
+                        ),
                 ),
     );
   }
 }
 
-class _NuevoClienteSheet extends StatefulWidget {
-  const _NuevoClienteSheet();
+/// Alta rápida de cliente. Devuelve el cliente creado.
+class NuevoClienteSheet extends StatefulWidget {
+  const NuevoClienteSheet({super.key});
 
   @override
-  State<_NuevoClienteSheet> createState() => _NuevoClienteSheetState();
+  State<NuevoClienteSheet> createState() => _NuevoClienteSheetState();
 }
 
-class _NuevoClienteSheetState extends State<_NuevoClienteSheet> {
+class _NuevoClienteSheetState extends State<NuevoClienteSheet> {
   final _nombreCtrl = TextEditingController();
+  final _apellidosCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   final _cedulaCtrl = TextEditingController();
   bool _guardando = false;
   String? _error;
 
+  @override
+  void dispose() {
+    for (final c in [_nombreCtrl, _apellidosCtrl, _telefonoCtrl, _cedulaCtrl]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
   Future<void> _guardar() async {
-    if (_nombreCtrl.text.isEmpty) {
-      setState(() => _error = 'El nombre es obligatorio');
+    if (_nombreCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Escribe el nombre del cliente.');
       return;
     }
     setState(() {
       _guardando = true;
       _error = null;
     });
+    String? texto(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
     try {
-      await apiClient.post('/api/clientes', {
-        'nombre': _nombreCtrl.text,
-        'telefono': _telefonoCtrl.text.isEmpty ? null : _telefonoCtrl.text,
-        'cedula_ruc': _cedulaCtrl.text.isEmpty ? null : _cedulaCtrl.text,
+      final data = await apiClient.post('/api/clientes', {
+        'nombre': _nombreCtrl.text.trim(),
+        'apellidos': texto(_apellidosCtrl),
+        'telefono': texto(_telefonoCtrl),
+        'cedula_ruc': texto(_cedulaCtrl),
       });
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, Cliente.fromJson(data));
     } catch (e) {
-      setState(() => _error = e is ApiException ? e.message : 'No se pudo crear el cliente');
-    } finally {
-      if (mounted) setState(() => _guardando = false);
+      if (mounted) {
+        setState(() {
+          _error = mensajeError(e, 'No se pudo guardar el cliente.');
+          _guardando = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const gap = SizedBox(height: 12);
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('Nuevo cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _nombreCtrl,
-            decoration: const InputDecoration(labelText: 'Nombre completo', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _telefonoCtrl,
-            decoration: const InputDecoration(labelText: 'Teléfono', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _cedulaCtrl,
-            decoration: const InputDecoration(labelText: 'Cédula / RUC', border: OutlineInputBorder()),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+      padding: EdgeInsets.fromLTRB(16, 18, 16, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Nuevo cliente', style: displayStyle(context, size: 28)),
+            const SizedBox(height: 14),
+            TextField(controller: _nombreCtrl, autofocus: true, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Nombre')),
+            gap,
+            TextField(controller: _apellidosCtrl, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Apellidos')),
+            gap,
+            TextField(controller: _telefonoCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Teléfono')),
+            gap,
+            TextField(controller: _cedulaCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cédula o RUC')),
+            if (_error != null) ...[gap, Aviso(_error!)],
+            const SizedBox(height: 18),
+            FilledButton(onPressed: _guardando ? null : _guardar, child: Text(_guardando ? 'Guardando…' : 'Guardar cliente')),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _guardando ? null : _guardar,
-            child: _guardando ? const CircularProgressIndicator(strokeWidth: 2) : const Text('Guardar'),
-          ),
-        ],
+        ),
       ),
     );
   }
