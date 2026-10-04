@@ -1,3 +1,4 @@
+from app.schemas.comunes import UrlArchivo
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -10,7 +11,7 @@ class FotoVehiculoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     tipo: TipoFoto
-    url: str
+    url: UrlArchivo
     observacion: str | None = None
     creado_en: datetime | None = None
 
@@ -20,7 +21,7 @@ class DocumentoVehiculoOut(BaseModel):
     id: int
     nombre: str
     tipo: TipoDocumento
-    url: str
+    url: UrlArchivo
     creado_en: datetime | None = None
 
 
@@ -67,7 +68,7 @@ class VehiculoOut(VehiculoBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     cliente_id: int
-    foto_placa_url: str | None = None
+    foto_placa_url: UrlArchivo = None
     cliente: ClienteOut | None = None
     fotos: list[FotoVehiculoOut] = []
     documentos: list[DocumentoVehiculoOut] = []
@@ -79,7 +80,7 @@ class PlacaDetectadaOut(BaseModel):
     placa_texto: str
     confianza: float
     vehiculo: VehiculoOut | None = None
-    foto_url: str
+    foto_url: UrlArchivo
 
 
 class TimelineEventoOut(BaseModel):

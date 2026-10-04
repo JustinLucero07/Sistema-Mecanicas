@@ -1,0 +1,31 @@
+# Caddy obtiene y renueva solo los certificados HTTPS (Let's Encrypt).
+{
+	email {$CORREO_TLS}
+}
+
+(seguridad) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	encode zstd gzip
+}
+
+{$DOMINIO_APP} {
+	import seguridad
+	reverse_proxy web:3000
+}
+
+{$DOMINIO_API} {
+	import seguridad
+	request_body {
+		max_size 15MB
+	}
+	reverse_proxy api:8000
+}
+
+# Fotos: el bucket es privado; solo responden los enlaces firmados por la API.
+{$DOMINIO_ARCHIVOS} {
+	import seguridad
+	reverse_proxy minio:9000
+}

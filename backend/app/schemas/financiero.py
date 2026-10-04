@@ -1,3 +1,4 @@
+from app.schemas.comunes import UrlArchivo
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -18,7 +19,7 @@ class IngresoOut(IngresoCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     fecha: datetime
-    comprobante_url: str | None = None
+    comprobante_url: UrlArchivo = None
 
 
 class PagoOrdenRequest(BaseModel):
@@ -41,7 +42,7 @@ class EgresoOut(EgresoCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     fecha: datetime
-    comprobante_url: str | None = None
+    comprobante_url: UrlArchivo = None
 
 
 class AperturaCajaRequest(BaseModel):

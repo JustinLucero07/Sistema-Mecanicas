@@ -22,3 +22,12 @@ mobile/.packages
 # General
 .DS_Store
 *.log
+
+# Secretos de producción y copias locales
+deploy/.env
+deploy/rclone.conf
+backend/.venv*/
+backend/.pytest_cache/
+mobile/android/key.properties
+*.jks
+*.dump

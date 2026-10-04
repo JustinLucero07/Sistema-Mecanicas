@@ -20,6 +20,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem("mecanica_theme") as ThemeMode | null;
     if (saved && ["light", "dark", "system"].includes(saved)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage solo existe tras montar en el navegador
       setThemeState(saved);
     }
   }, []);

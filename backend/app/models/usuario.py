@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -20,6 +22,10 @@ class Usuario(Base, TimestampMixin):
     cargo: Mapped[str | None] = mapped_column(String(80))
     especialidad: Mapped[str | None] = mapped_column(String(100))  # Ej: Motor, Electricidad, Suspensión
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Se incrementa al cambiar la contraseña o desactivar: invalida tokens viejos.
+    sesion_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    terminos_version: Mapped[str | None] = mapped_column(String(20))
+    terminos_aceptados_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Solo aplica si rol == CLIENTE: vincula el usuario a su ficha de cliente
     cliente_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), nullable=True)

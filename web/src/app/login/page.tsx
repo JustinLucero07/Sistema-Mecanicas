@@ -69,6 +69,14 @@ export default function LoginPage() {
           <Button type="submit" size="lg" disabled={cargando} className="mt-6 w-full">
             {cargando ? "Entrando…" : "Entrar"}
           </Button>
+          <p className="mt-6 text-center text-[0.87rem] text-ink-3">
+            ¿Olvidaste tu contraseña? Pide al administrador del taller que te asigne una nueva.
+          </p>
+          <p className="mt-2 text-center text-[0.87rem] text-ink-3">
+            <a href="/legal/terminos" className="hover:text-ink hover:underline">Términos</a>
+            {" · "}
+            <a href="/legal/privacidad" className="hover:text-ink hover:underline">Privacidad</a>
+          </p>
         </form>
       </main>
     </div>

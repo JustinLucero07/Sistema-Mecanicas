@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'cuenta_screen.dart';
 import 'escanear_placa_screen.dart';
 import 'orden_detalle_screen.dart';
 
@@ -66,9 +67,9 @@ class _TallerScreenState extends State<TallerScreen> {
                     child: Text('Hola, ${auth.nombre?.split(' ').first ?? ''}', style: displayStyle(context, size: 32)),
                   ),
                   IconButton(
-                    onPressed: () => context.read<AuthService>().logout(),
-                    tooltip: 'Cerrar sesión',
-                    icon: Icon(Icons.logout, color: c.ink3),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CuentaScreen())),
+                    tooltip: 'Mi cuenta',
+                    icon: Icon(Icons.account_circle_outlined, color: c.ink2, size: 28),
                   ),
                 ],
               ),

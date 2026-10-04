@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.core.contexto import fijar_usuario
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.base import RolUsuario
@@ -30,6 +31,14 @@ def get_current_user(
     user = db.get(Usuario, int(user_id))
     if user is None or not user.activo:
         raise credentials_exception
+    # Cambiar la contraseña o desactivar al usuario sube la versión e
+    # invalida todos los tokens emitidos antes.
+    if payload.get("ver", 0) != (user.sesion_version or 0):
+        raise credentials_exception
+    if user.organizacion is not None and not user.organizacion.activo:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta del taller está suspendida")
+
+    fijar_usuario(user.id, user.organizacion_id)
     return user
 
 
@@ -37,9 +46,8 @@ def get_current_tenant_id(current_user: Usuario = Depends(get_current_user)) -> 
     """Devuelve el ID de la organización/tenant del usuario autenticado."""
     if current_user.organizacion_id is not None:
         return current_user.organizacion_id
-    if current_user.rol in (RolUsuario.SUPERADMIN, RolUsuario.ADMIN, RolUsuario.ADMIN_TALLER):
-        # Admin / Superadmin puede operar con tenant por defecto (1) si no está explícito
-        return 1
+    # Nunca se asigna un taller "por defecto": operar sobre datos de un taller
+    # exige pertenecer a él.
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="El usuario no pertenece a ninguna organización activa",

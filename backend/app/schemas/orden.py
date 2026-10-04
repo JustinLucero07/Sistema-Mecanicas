@@ -1,3 +1,4 @@
+from app.schemas.comunes import UrlArchivo
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -32,7 +33,7 @@ class FotoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     tipo: TipoFoto
-    url: str
+    url: UrlArchivo
     descripcion: str | None = None
     creado_en: datetime | None = None
 
@@ -89,8 +90,8 @@ class OrdenTrabajoOut(OrdenTrabajoBase):
     saldo_pendiente: float
     fecha_ingreso: datetime
     fecha_entrega_real: datetime | None = None
-    firma_cliente_url: str | None = None
-    firma_mecanico_url: str | None = None
+    firma_cliente_url: UrlArchivo = None
+    firma_mecanico_url: UrlArchivo = None
 
     detalles: list[DetalleOrdenOut] = []
     fotos: list[FotoOut] = []

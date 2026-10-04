@@ -8,9 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 String get kApiBaseUrl {
   const envUrl = String.fromEnvironment('API_URL');
   if (envUrl.isNotEmpty) return envUrl;
+  // Una versión de publicación sin servidor configurado no debe salir nunca.
+  if (kReleaseMode) {
+    throw StateError('Compila con --dart-define=API_URL=https://api.tudominio.com');
+  }
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8001';
   return 'http://localhost:8001';
 }
+
+/// Se llama cuando el servidor rechaza el token (vencido o sesión cerrada).
+VoidCallback? alExpirarSesion;
 
 class ApiException implements Exception {
   final int status;
@@ -45,8 +52,17 @@ class ApiClient {
     String detail = res.reasonPhrase ?? 'Error';
     try {
       final body = jsonDecode(utf8.decode(res.bodyBytes));
-      detail = body['detail']?.toString() ?? detail;
+      final d = body['detail'];
+      if (d is String) {
+        detail = d;
+      } else if (d is List && d.isNotEmpty && d.first is Map) {
+        // Errores de validación: se muestra el primero, sin el prefijo técnico.
+        detail = (d.first['msg'] ?? detail).toString().replaceFirst('Value error, ', '');
+      }
     } catch (_) {}
+    if (res.statusCode == 401 && !res.request!.url.path.endsWith('/api/auth/login')) {
+      alExpirarSesion?.call();
+    }
     throw ApiException(res.statusCode, detail);
   }
 

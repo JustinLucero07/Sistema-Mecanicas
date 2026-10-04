@@ -5,6 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Boxes,
+  History,
+  UserCog,
   CarFront,
   ClipboardList,
   LayoutGrid,
@@ -24,8 +26,10 @@ import { useTheme } from "@/lib/theme-context";
 import { etiqueta } from "@/lib/format";
 import type { Rol } from "@/lib/types";
 import ScannerModal from "@/components/ScannerModal";
+import TerminosGate from "@/components/TerminosGate";
 import { Button, cn } from "@/components/ui";
 
+const ROLES_ADMIN: Rol[] = ["superadmin", "admin_taller", "admin"];
 const ROLES_FINANZAS: Rol[] = ["superadmin", "admin_taller", "admin", "gerente", "contabilidad", "cajero"];
 
 const NAV: { href: string; label: string; icon: LucideIcon; roles?: Rol[] }[] = [
@@ -35,7 +39,13 @@ const NAV: { href: string; label: string; icon: LucideIcon; roles?: Rol[] }[] = 
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/financiero", label: "Caja y finanzas", icon: Wallet, roles: ROLES_FINANZAS },
+  { href: "/usuarios", label: "Equipo", icon: UserCog, roles: ROLES_ADMIN },
+  { href: "/actividad", label: "Actividad", icon: History, roles: ROLES_ADMIN },
 ];
+
+export function esAdmin(rol: Rol | undefined): boolean {
+  return !!rol && ROLES_ADMIN.includes(rol);
+}
 
 export function puedeVerFinanzas(rol: Rol | undefined): boolean {
   return !!rol && ROLES_FINANZAS.includes(rol);
@@ -80,6 +90,8 @@ export default function ProtectedShell({ children }: { children: React.ReactNode
     return <div className="grid min-h-screen place-items-center text-ink-3">Cargando…</div>;
   }
 
+  if (sesion.requiereTerminos) return <TerminosGate />;
+
   const items = NAV.filter((item) => !item.roles || item.roles.includes(sesion.rol));
 
   function onBuscar(e: React.FormEvent) {
@@ -116,10 +128,10 @@ export default function ProtectedShell({ children }: { children: React.ReactNode
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-raised text-[0.87rem] font-semibold text-ink-2">
         {sesion.nombre.slice(0, 2).toUpperCase()}
       </span>
-      <div className="min-w-0 flex-1">
+      <Link href="/cuenta" onClick={() => setMenuOpen(false)} className="min-w-0 flex-1 rounded-lg hover:text-brand-text" title="Mi cuenta">
         <p className="truncate text-[0.93rem] font-semibold text-ink">{sesion.nombre}</p>
-        <p className="truncate text-[0.8rem] text-ink-3">{etiqueta(sesion.rol)}</p>
-      </div>
+        <p className="truncate text-[0.8rem] text-ink-3">{etiqueta(sesion.rol)} · Mi cuenta</p>
+      </Link>
       <button onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión" className="rounded-lg p-2 text-ink-3 hover:bg-raised hover:text-bad">
         <LogOut className="size-[1.15rem]" />
       </button>

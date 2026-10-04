@@ -151,3 +151,61 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Textos legales: tipografía de lectura larga. */
+.legal h1 {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  line-height: 1.05;
+  margin-bottom: 1rem;
+}
+.legal h2 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  margin: 2.2rem 0 0.6rem;
+}
+.legal p,
+.legal li {
+  color: var(--ink-2);
+  line-height: 1.7;
+  max-width: 70ch;
+}
+.legal p + p {
+  margin-top: 0.8rem;
+}
+.legal ul {
+  list-style: disc;
+  padding-left: 1.3rem;
+  margin: 0.6rem 0;
+}
+.legal li + li {
+  margin-top: 0.35rem;
+}
+.legal a {
+  color: var(--brand-text);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.legal strong {
+  color: var(--ink);
+}
+.legal table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.93rem;
+}
+.legal th,
+.legal td {
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+  color: var(--ink-2);
+}
+.legal th {
+  background: var(--raised);
+  color: var(--ink);
+}

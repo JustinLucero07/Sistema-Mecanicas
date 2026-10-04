@@ -19,6 +19,20 @@ Plataforma SaaS profesional, moderna y escalable para la gestión operativa y fi
 
 ---
 
+## 🔒 Seguridad y datos personales
+
+- Contraseñas con bcrypt; política mínima (10 caracteres, letras y números); bloqueo temporal tras 5 intentos fallidos.
+- Cambiar la contraseña o desactivar a un usuario cierra todas sus sesiones.
+- Aislamiento entre talleres verificado en **cada escritura** de la base de datos, no solo en cada endpoint.
+- Bitácora de auditoría automática (pantalla **Actividad**): quién creó, cambió o eliminó cada dato, cuándo y desde qué IP.
+- Fotos en almacenamiento privado con enlaces firmados que vencen; se validan y se les quita la ubicación GPS.
+- Términos y política de privacidad (LOPDP Ecuador) con aceptación obligatoria y versionada; exportación y anonimización de datos de clientes.
+- La API no arranca en producción con claves de ejemplo.
+
+Guía completa de despliegue, respaldos y lista antes de vender: [docs/PRODUCCION.md](docs/PRODUCCION.md).
+
+---
+
 ## 📂 Estructura del Proyecto
 
 ```
@@ -61,8 +75,7 @@ cd backend
 # Requiere Python 3.12 (con 3.14 no compilan las dependencias).
 # Si el sistema no lo trae: uv venv --python 3.12 .venv
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install pytest httpx
+pip install -r requirements-dev.txt
 
 # Ejecutar migraciones de base de datos
 .venv/bin/alembic upgrade head
@@ -77,7 +90,7 @@ pip install pytest httpx
 #### Ejecutar Pruebas Automatizadas
 ```bash
 cd backend
-.venv/bin/pytest tests/test_api.py -v
+.venv/bin/pytest -q          # API, seguridad y esquema de base de datos
 ```
 
 ### 3. Frontend Web (Next.js)
@@ -99,7 +112,7 @@ flutter run --dart-define=API_URL=http://10.0.2.2:8001   # Emulador Android
 
 ---
 
-## 🔑 Credenciales de Prueba (Seed)
+## 🔑 Credenciales de Prueba (solo desarrollo)
 
 | Rol | Correo | Contraseña | Organización |
 | :--- | :--- | :--- | :--- |

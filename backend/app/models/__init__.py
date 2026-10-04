@@ -1,5 +1,6 @@
 """Importa todos los modelos para que SQLAlchemy y Alembic los detecten."""
 
+from app.models.auditoria import AuditLog  # noqa: F401
 from app.models.citas import Bahia, Cita
 from app.models.cliente import Cliente
 from app.models.financiero import CajaDiaria, CuentaPorCobrar, CuentaPorPagar, Egreso, Ingreso

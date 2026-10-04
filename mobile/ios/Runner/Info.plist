@@ -7,7 +7,11 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mobile</string>
+	<string>MecánicaOS</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Se usa la cámara para leer la placa del vehículo y fotografiar su estado al recibirlo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Se usan fotos de tu galería para adjuntarlas a la orden de trabajo.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

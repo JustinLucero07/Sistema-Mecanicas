@@ -51,14 +51,19 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_sucursales_organizacion_id'), 'sucursales', ['organizacion_id'], unique=False)
+    # Solo al migrar una instalación anterior (de un único taller) hace falta
+    # una organización a la que asignar los datos existentes. En una base
+    # nueva no se crea nada: los talleres se dan de alta con crear_taller.py.
     op.execute(
         """
         INSERT INTO organizaciones (id, nombre, slug, plan, activo, creado_en, actualizado_en)
-        VALUES (1, 'Taller Mecánico Central', 'taller-central', 'PRO', true, now(), now())
+        SELECT 1, 'Taller Mecánico Central', 'taller-central', 'PRO', true, now(), now()
+        WHERE EXISTS (SELECT 1 FROM usuarios)
         ON CONFLICT (id) DO NOTHING;
-        
+
         INSERT INTO sucursales (id, organizacion_id, nombre, codigo, es_matriz, activa, creado_en, actualizado_en)
-        VALUES (1, 1, 'Sede Matriz Norte', 'MAT-01', true, true, now(), now())
+        SELECT 1, 1, 'Sede Matriz Norte', 'MAT-01', true, true, now(), now()
+        WHERE EXISTS (SELECT 1 FROM organizaciones WHERE id = 1)
         ON CONFLICT (id) DO NOTHING;
         """
     )

@@ -1,0 +1,9 @@
+# Configuración del destino de respaldos fuera del servidor.
+# Copia como rclone.conf. Ejemplo con Backblaze B2 (barato y compatible):
+#
+# [b2]
+# type = b2
+# account = TU_KEY_ID
+# key = TU_APPLICATION_KEY
+#
+# Luego en .env:  OFFSITE_REMOTE=b2:nombre-de-tu-bucket

@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, String, Text
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +20,10 @@ class Cliente(Base, TenantMixin, TimestampMixin):
     ciudad: Mapped[str | None] = mapped_column(String(100))
     direccion: Mapped[str | None] = mapped_column(String(255))
     notas: Mapped[str | None] = mapped_column(Text)
+    # Consentimiento explícito (LOPDP) para recibir recordatorios y mensajes.
+    acepta_comunicaciones: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Fecha en que se anonimizó por pedido del titular de los datos.
+    anonimizado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     vehiculos = relationship("Vehiculo", back_populates="cliente", cascade="all, delete-orphan")
     ordenes = relationship("OrdenTrabajo", back_populates="cliente")

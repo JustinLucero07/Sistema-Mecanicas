@@ -1,0 +1,111 @@
+# Producción en una VPS. Uso (desde la carpeta deploy/):
+#   cp .env.example .env   # y completa los valores
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Solo Caddy expone puertos (80 y 443). Base de datos, MinIO, API y web
+# quedan en la red interna.
+name: mecanicaos
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMINIO_APP: ${DOMINIO_APP}
+      DOMINIO_API: ${DOMINIO_API}
+      DOMINIO_ARCHIVOS: ${DOMINIO_ARCHIVOS}
+      CORREO_TLS: ${CORREO_TLS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, api]
+
+  web:
+    build:
+      context: ../web
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMINIO_API}
+        NEXT_PUBLIC_ARCHIVOS_URL: https://${DOMINIO_ARCHIVOS}
+        NEXT_PUBLIC_EMPRESA_NOMBRE: ${EMPRESA_NOMBRE}
+        NEXT_PUBLIC_EMPRESA_RAZON_SOCIAL: ${EMPRESA_RAZON_SOCIAL}
+        NEXT_PUBLIC_EMPRESA_RUC: ${EMPRESA_RUC}
+        NEXT_PUBLIC_EMPRESA_DIRECCION: ${EMPRESA_DIRECCION}
+        NEXT_PUBLIC_EMPRESA_CORREO: ${EMPRESA_CORREO}
+        NEXT_PUBLIC_EMPRESA_CORREO_PRIVACIDAD: ${EMPRESA_CORREO_PRIVACIDAD}
+        NEXT_PUBLIC_EMPRESA_CIUDAD: ${EMPRESA_CIUDAD}
+        NEXT_PUBLIC_EMPRESA_HOSTING: ${EMPRESA_HOSTING}
+        NEXT_PUBLIC_LEGAL_REVISADO: ${LEGAL_REVISADO:-0}
+    restart: unless-stopped
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg2://mecanica:${POSTGRES_PASSWORD}@db:5432/mecanica
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: '["https://${DOMINIO_APP}"]'
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_PUBLIC_ENDPOINT_URL: https://${DOMINIO_ARCHIVOS}
+      S3_ACCESS_KEY: ${MINIO_USUARIO}
+      S3_SECRET_KEY: ${MINIO_CLAVE}
+      S3_BUCKET: mecanica-fotos
+    depends_on:
+      db: { condition: service_healthy }
+      minio: { condition: service_started }
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mecanica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: mecanica
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mecanica"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USUARIO}
+      MINIO_ROOT_PASSWORD: ${MINIO_CLAVE}
+    volumes:
+      - minio_data:/data
+
+  respaldos:
+    build: ./backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: mecanica
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: mecanica
+      HORA_RESPALDO: ${HORA_RESPALDO:-03}
+      # Copia fuera del servidor (rclone). Vacío = solo copias locales.
+      OFFSITE_REMOTE: ${OFFSITE_REMOTE:-}
+      RCLONE_CONFIG_MINIO_TYPE: s3
+      RCLONE_CONFIG_MINIO_PROVIDER: Minio
+      RCLONE_CONFIG_MINIO_ENDPOINT: http://minio:9000
+      RCLONE_CONFIG_MINIO_ACCESS_KEY_ID: ${MINIO_USUARIO}
+      RCLONE_CONFIG_MINIO_SECRET_ACCESS_KEY: ${MINIO_CLAVE}
+    volumes:
+      - respaldos:/respaldos
+      - ./rclone.conf:/config/rclone/rclone.conf:ro
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  db_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  respaldos:

@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from app.config import get_settings  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models.base import (  # noqa: E402
@@ -33,6 +34,9 @@ ADMIN_PASSWORD = os.getenv("SEED_ADMIN_PASSWORD", "admin123")
 
 
 def main() -> None:
+    if get_settings().es_produccion:
+        sys.exit("seed.py crea datos y contraseñas de demostración: no se ejecuta en producción. "
+                 "Para dar de alta un taller usa: python crear_taller.py")
     db = SessionLocal()
     try:
         # 1. Organización inicial (Tenant)

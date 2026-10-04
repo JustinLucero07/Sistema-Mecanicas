@@ -16,3 +16,5 @@ class TokenResponse(BaseModel):
     usuario_id: int
     organizacion_id: int | None = None
     sucursal_id: int | None = None
+    requiere_aceptar_terminos: bool = False
+    terminos_version: str | None = None

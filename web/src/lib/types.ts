@@ -22,6 +22,7 @@ export interface Cliente {
   direccion: string | null;
   notas?: string | null;
   nombre_completo?: string;
+  acepta_comunicaciones?: boolean | null;
 }
 
 export interface FotoVehiculo {

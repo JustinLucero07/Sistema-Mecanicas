@@ -11,6 +11,7 @@ class ClienteBase(BaseModel):
     ciudad: str | None = None
     direccion: str | None = None
     notas: str | None = None
+    acepta_comunicaciones: bool = False
 
 
 class ClienteCreate(ClienteBase):
@@ -27,6 +28,7 @@ class ClienteUpdate(BaseModel):
     ciudad: str | None = None
     direccion: str | None = None
     notas: str | None = None
+    acepta_comunicaciones: bool | None = None
 
 
 class ClienteOut(ClienteBase):

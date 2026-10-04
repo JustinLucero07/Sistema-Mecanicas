@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_shell.dart';
+import 'screens/terminos_screen.dart';
 import 'theme.dart';
 
 void main() {
@@ -39,6 +40,7 @@ class _RaizApp extends StatelessWidget {
     if (auth.cargando) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return auth.autenticado ? const HomeShell() : const LoginScreen();
+    if (!auth.autenticado) return const LoginScreen();
+    return auth.requiereTerminos ? const TerminosScreen() : const HomeShell();
   }
 }
