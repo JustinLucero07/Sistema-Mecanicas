@@ -119,7 +119,7 @@ def obtener_timeline(
     eventos = []
     for ord in ordenes:
         repuestos = [
-            f"{d.descripcion} (x{d.cantidad})"
+            f"{d.descripcion} ×{d.cantidad.normalize():f}"  # 1.00 → ×1, 2.50 → ×2.5
             for d in ord.detalles
             if d.tipo.value == "repuesto"
         ]

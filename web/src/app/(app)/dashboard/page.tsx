@@ -6,7 +6,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { CarFront, Plus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { etiqueta, formatoMoneda, formatoPct, nombreMes } from "@/lib/format";
+import { etiqueta, formatoMoneda, formatoPct, nombreCategoria, nombreMes } from "@/lib/format";
 import type { DashboardFinanciero, OrdenTrabajo } from "@/lib/types";
 import { puedeVerFinanzas } from "@/components/ProtectedShell";
 import WorkshopBoard from "@/components/WorkshopBoard";
@@ -159,7 +159,7 @@ export default function DashboardPage() {
                 {finanzas.egresos_por_categoria.map((e) => (
                   <div key={e.categoria}>
                     <div className="flex justify-between text-[0.93rem]">
-                      <span className="text-ink-2">{etiqueta(e.categoria)}</span>
+                      <span className="text-ink-2">{nombreCategoria(e.categoria)}</span>
                       <span className="font-semibold">{formatoMoneda(e.total)}</span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-raised">

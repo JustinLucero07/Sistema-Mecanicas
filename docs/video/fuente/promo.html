@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MecánicaOS promo</title>
+<style>
+  @font-face { font-family: Barlow; src: url(fonts/Barlow-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Barlow; src: url(fonts/Barlow-Medium.ttf); font-weight: 500; }
+  @font-face { font-family: Barlow; src: url(fonts/Barlow-SemiBold.ttf); font-weight: 600; }
+  @font-face { font-family: Barlow; src: url(fonts/Barlow-Bold.ttf); font-weight: 700; }
+  @font-face { font-family: BC; src: url(fonts/BarlowCondensed-SemiBold.ttf); font-weight: 600; }
+  @font-face { font-family: BC; src: url(fonts/BarlowCondensed-Bold.ttf); font-weight: 700; }
+  :root { --brand: #0b6b6b; --brand-l: #3db5ac; --signal: #e8a317; --ink: #e9eef1; --ink2: #b6c2ca; --bg: #0b1417; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: Barlow, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden;
+    background: radial-gradient(1400px 900px at 78% 18%, #0f3a3b 0%, #0b1d20 45%, var(--bg) 100%); }
+  .grid { position: absolute; inset: 0; opacity: .5;
+    background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 64px 64px; mask-image: radial-gradient(900px 700px at 60% 40%, #000 30%, transparent 80%); }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .abs { position: absolute; will-change: transform, opacity; }
+  .h1 { font-family: BC; font-weight: 700; font-size: 112px; line-height: .98; letter-spacing: -1px; }
+  .h2 { font-family: BC; font-weight: 700; font-size: 84px; line-height: 1; letter-spacing: -.5px; }
+  .p { font-size: 36px; line-height: 1.35; color: var(--ink2); font-weight: 500; }
+  .kicker { font-family: BC; font-weight: 600; font-size: 30px; letter-spacing: 4px; text-transform: uppercase; color: var(--brand-l); }
+  .amber { color: var(--signal); }
+  .teal { color: var(--brand-l); }
+
+  /* Placa ecuatoriana */
+  .placa { background: #fff; color: #111; border: 10px solid #111; border-radius: 26px; overflow: hidden; text-align: center; box-shadow: 0 40px 120px rgba(0,0,0,.55); }
+  .placa .top { background: #1b2228; color: #fff; font-family: Barlow; font-weight: 700; letter-spacing: 14px; font-size: 34px; padding: 10px 0 8px 14px; }
+  .placa .num { font-family: BC; font-weight: 700; font-size: 210px; letter-spacing: 8px; line-height: 1; padding: 8px 46px 18px; }
+
+  .logo { display: flex; align-items: center; gap: 30px; }
+  .logo .m { width: 132px; height: 132px; border-radius: 30px; background: var(--brand); display: grid; place-items: center; font-family: BC; font-weight: 700; font-size: 96px; color: #fff; box-shadow: 0 20px 60px rgba(11,107,107,.45), inset 0 0 0 2px rgba(255,255,255,.12); }
+  .logo .t { font-family: BC; font-weight: 700; font-size: 132px; letter-spacing: -1px; }
+
+  /* Ventana de navegador */
+  .browser { border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 50px 140px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); }
+  .browser .bar { height: 44px; background: #e9ebe8; display: flex; align-items: center; gap: 9px; padding: 0 18px; }
+  .browser .bar i { width: 13px; height: 13px; border-radius: 50%; background: #cfd3cf; display: block; }
+  .browser .bar .url { margin-left: 20px; flex: 0 0 420px; height: 26px; border-radius: 8px; background: #fff; font-size: 15px; color: #68747f; display: flex; align-items: center; padding-left: 14px; }
+  .browser .view { position: relative; overflow: hidden; }
+  .browser .view img { display: block; width: 100%; transform-origin: 0 0; }
+
+  /* Teléfono */
+  .phone { width: 430px; height: 905px; border-radius: 64px; background: #0a0d0f; padding: 14px; box-shadow: 0 50px 140px rgba(0,0,0,.65), 0 0 0 2px #2a3238, inset 0 0 0 2px #1c2227; }
+  .phone .screen { position: relative; width: 100%; height: 100%; border-radius: 50px; overflow: hidden; background: #f2f3f0; }
+  .phone .screen img { position: absolute; top: 0; left: 0; width: 100%; }
+  .phone .notch { position: absolute; top: 14px; left: 50%; width: 120px; height: 32px; margin-left: -60px; border-radius: 20px; background: #0a0d0f; z-index: 3; }
+
+  .caption { left: 120px; top: 70px; }
+  .chip { display: inline-flex; align-items: center; gap: 18px; padding: 20px 30px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); font-size: 34px; font-weight: 600; }
+  .chip svg { width: 38px; height: 38px; flex: none; }
+  .hl { position: absolute; border: 5px solid var(--signal); border-radius: 18px; box-shadow: 0 0 0 9999px rgba(8,18,20,.0); }
+  .bar-progress { position: absolute; left: 0; bottom: 0; height: 6px; background: linear-gradient(90deg, var(--brand), var(--brand-l)); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="grid"></div>
+
+  <!-- 1. Gancho -->
+  <section class="scene" id="s1">
+    <div class="abs h2" id="s1a" style="left:0;width:1920px;top:250px;text-align:center">Llega un carro al taller.</div>
+    <div class="abs h1 amber" id="s1b" style="left:0;width:1920px;top:360px;text-align:center">¿Qué le hicieron la última vez?</div>
+    <div class="abs placa" id="s1p" style="left:50%;top:560px;transform-origin:50% 0"><div class="top">ECUADOR</div><div class="num">ABC-1234</div></div>
+  </section>
+
+  <!-- 2. Marca -->
+  <section class="scene" id="s2">
+    <div class="abs logo" id="s2l" style="left:0;width:1920px;justify-content:center;top:360px"><div class="m">M</div><div class="t">MecánicaOS</div></div>
+    <div class="abs p" id="s2t" style="left:0;width:1920px;top:560px;text-align:center;font-size:46px;color:var(--ink)">La placa abre <span class="teal" style="font-weight:700">todo el historial</span> del vehículo.</div>
+  </section>
+
+  <!-- 3. Escanear placa en el celular -->
+  <section class="scene" id="s3">
+    <div class="abs" id="s3t" style="left:150px;top:300px;width:820px">
+      <div class="kicker">App para mecánicos</div>
+      <div class="h1" style="margin-top:18px">Una foto<br>de la placa.</div>
+      <div class="p" style="margin-top:34px">Y aparece todo: visitas, kilómetros, diagnósticos y repuestos usados.</div>
+    </div>
+    <div class="abs phone" id="s3ph" style="left:1240px;top:88px"><div class="notch"></div><div class="screen">
+      <img id="s3i1" src="shots/m_escanear.png"><img id="s3i2" src="shots/m_historial.png" style="opacity:0">
+    </div></div>
+  </section>
+
+  <!-- 4. Ficha del vehículo en la web -->
+  <section class="scene" id="s4">
+    <div class="abs caption" id="s4c"><div class="kicker">Ficha del vehículo</div><div class="h2" style="margin-top:10px">Cada visita, en una línea de tiempo.</div></div>
+    <div class="abs browser" id="s4b" style="left:260px;top:270px;width:1400px">
+      <div class="bar"><i></i><i></i><i></i><div class="url">MecánicaOS · Ficha del vehículo</div></div>
+      <div class="view" style="height:900px"><img id="s4i" src="shots/vehiculo_full.png" style="width:1682px"></div>
+    </div>
+  </section>
+
+  <!-- 5. Tablero del taller -->
+  <section class="scene" id="s5">
+    <div class="abs caption" id="s5c"><div class="kicker">Para el dueño</div><div class="h2" style="margin-top:10px">Todo el taller, de un vistazo.</div></div>
+    <div class="abs browser" id="s5b" style="left:260px;top:270px;width:1400px">
+      <div class="bar"><i></i><i></i><i></i><div class="url">MecánicaOS · Taller</div></div>
+      <div class="view" style="height:875px"><img id="s5i" src="shots/dashboard.png"></div>
+    </div>
+  </section>
+
+  <!-- 6. Dos celulares -->
+  <section class="scene" id="s6">
+    <div class="abs" id="s6t" style="left:150px;top:290px;width:760px">
+      <div class="kicker">En el patio</div>
+      <div class="h1" style="margin-top:18px">Tus mecánicos, desde el celular.</div>
+      <div class="p" style="margin-top:34px">Ven sus trabajos, anotan el diagnóstico y suben fotos de antes y después.</div>
+    </div>
+    <div class="abs phone" id="s6p1" style="left:960px;top:120px"><div class="notch"></div><div class="screen"><img src="shots/m_taller.png"></div></div>
+    <div class="abs phone" id="s6p2" style="left:1420px;top:60px"><div class="notch"></div><div class="screen"><img src="shots/m_vehiculo.png"></div></div>
+  </section>
+
+  <!-- 7. Finanzas -->
+  <section class="scene" id="s7">
+    <div class="abs caption" id="s7c"><div class="kicker">Caja y finanzas</div><div class="h2" style="margin-top:10px">Sabes cuánto ganas, <span class="amber">cada mes.</span></div></div>
+    <div class="abs browser" id="s7b" style="left:260px;top:270px;width:1400px">
+      <div class="bar"><i></i><i></i><i></i><div class="url">MecánicaOS · Caja y finanzas</div></div>
+      <div class="view" style="height:875px"><img id="s7i" src="shots/financiero.png"><div class="hl" id="s7h"></div></div>
+    </div>
+  </section>
+
+  <!-- 8. Seguridad -->
+  <section class="scene" id="s8">
+    <div class="abs" style="left:130px;top:120px;width:820px">
+      <div class="kicker" id="s8k">Seguro desde el primer día</div>
+      <div class="h2" id="s8h" style="margin-top:14px">Tus datos y los de tus clientes, protegidos.</div>
+      <div id="s8list" style="margin-top:54px;display:flex;flex-direction:column;gap:20px"></div>
+    </div>
+    <div class="abs browser" id="s8b" style="left:1010px;top:200px;width:800px">
+      <div class="bar"><i></i><i></i><i></i><div class="url">MecánicaOS · Actividad</div></div>
+      <div class="view" style="height:640px"><img src="shots/actividad_ordenes.png" style="width:1250px;transform:translate(-200px,-70px)"></div>
+    </div>
+  </section>
+
+  <!-- 9. Cierre -->
+  <section class="scene" id="s9">
+    <div class="abs logo" id="s9l" style="left:0;width:1920px;justify-content:center;top:250px"><div class="m">M</div><div class="t">MecánicaOS</div></div>
+    <div class="abs p" id="s9t" style="left:0;width:1920px;top:450px;text-align:center;font-size:48px;color:var(--ink)">El sistema para talleres mecánicos.</div>
+    <div class="abs" id="s9d" style="left:0;width:1920px;top:560px;display:flex;justify-content:center;gap:22px">
+      <span class="chip">Web</span><span class="chip">Android</span><span class="chip">iPhone</span><span class="chip">Modo oscuro</span>
+    </div>
+    <div class="abs" id="s9c" style="left:0;width:1920px;top:740px;text-align:center">
+      <span style="display:inline-block;background:var(--signal);color:#1b1405;font-family:BC;font-weight:700;font-size:58px;padding:22px 56px;border-radius:20px">Pide tu demostración</span>
+      <div id="contacto" class="p" style="margin-top:26px;font-size:40px;color:var(--ink)"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const PUNTOS = [
+  "Contraseñas cifradas con bcrypt",
+  "Cada taller ve solo sus datos",
+  "Registro de quién cambió qué",
+  "Respaldos diarios verificados",
+  "Ley de Protección de Datos (LOPDP)",
+];
+const check = '<svg viewBox="0 0 24 24" fill="none" stroke="#3db5ac" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+document.getElementById("s8list").innerHTML = PUNTOS.map((p, i) => `<div class="chip abs-item" id="s8i${i}" style="opacity:0">${check}${p}</div>`).join("");
+const contacto = new URLSearchParams(location.search).get("contacto");
+if (contacto) document.getElementById("contacto").textContent = contacto;
+
+const $ = (id) => document.getElementById(id);
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+/** Progreso 0→1 (con easing) entre a y a+d segundos. */
+const p = (t, a, d, e = easeOut) => e(clamp((t - a) / d));
+/** Entrada típica: sube y aparece. */
+function rise(el, t, a, d = 0.7, dist = 40, extra = "") {
+  const k = p(t, a, d);
+  el.style.opacity = k;
+  el.style.transform = `translateY(${(1 - k) * dist}px) ${extra}`;
+}
+
+const ESCENAS = [
+  { id: "s1", ini: 0, fin: 5.2, upd(t) {
+      rise($("s1a"), t, 0.2);
+      rise($("s1b"), t, 1.1);
+      const k = p(t, 2.3, 0.9);
+      $("s1p").style.opacity = k;
+      $("s1p").style.transform = `translateX(-50%) scale(${0.82 + 0.18 * k + t * 0.006})`;
+    } },
+  { id: "s2", ini: 5.2, fin: 9.4, upd(t) {
+      const k = p(t, 0.1, 0.9);
+      $("s2l").style.opacity = k;
+      $("s2l").style.transform = `scale(${0.92 + 0.08 * k})`;
+      rise($("s2t"), t, 0.9);
+    } },
+  { id: "s3", ini: 9.4, fin: 17, upd(t) {
+      rise($("s3t"), t, 0.2, 0.8);
+      const k = p(t, 0.1, 1.0);
+      $("s3ph").style.opacity = k;
+      $("s3ph").style.transform = `translateY(${(1 - k) * 120}px) rotate(${(1 - k) * 4}deg)`;
+      const c = p(t, 3.0, 0.6, easeInOut);
+      $("s3i2").style.opacity = c;
+      $("s3i1").style.opacity = 1 - c;
+    } },
+  { id: "s4", ini: 17, fin: 24.4, upd(t) {
+      rise($("s4c"), t, 0.1);
+      rise($("s4b"), t, 0.25, 0.9, 120);
+      // Imagen de 1682×1740 desplazada 282px: se ve solo el contenido, sin la barra lateral.
+      $("s4i").style.transform = `translate(-282px, ${-p(t, 1.6, 5.0, easeInOut) * 780}px)`;
+    } },
+  { id: "s5", ini: 24.4, fin: 31.4, upd(t) {
+      rise($("s5c"), t, 0.1);
+      rise($("s5b"), t, 0.25, 0.9, 120);
+      const z = p(t, 1.8, 4.6, easeInOut);
+      $("s5i").style.transform = `scale(${1 + 0.2 * z}) translate(${-240 * z}px, ${-150 * z}px)`;
+    } },
+  { id: "s6", ini: 31.4, fin: 38.2, upd(t) {
+      rise($("s6t"), t, 0.2, 0.8);
+      rise($("s6p1"), t, 0.15, 1.0, 160);
+      rise($("s6p2"), t, 0.45, 1.0, 160);
+      const f = Math.sin(t * 1.2) * 6;
+      $("s6p1").style.transform += ` translateY(${f}px)`;
+      $("s6p2").style.transform += ` translateY(${-f}px)`;
+    } },
+  { id: "s7", ini: 38.2, fin: 45, upd(t) {
+      rise($("s7c"), t, 0.1);
+      rise($("s7b"), t, 0.25, 0.9, 120);
+      const z = p(t, 1.7, 1.8, easeInOut);
+      $("s7i").style.transform = `scale(${1 + 0.38 * z}) translate(${-160 * z}px, ${-150 * z}px)`;
+      // Recuadro sobre el resumen del mes (coordenadas en la vista ya ampliada).
+      const h = $("s7h"), k = p(t, 3.6, 0.5);
+      h.style.opacity = k;
+      Object.assign(h.style, { left: "105px", top: "165px", width: "1120px", height: "145px", transform: `scale(${1.04 - 0.04 * k})` });
+    } },
+  { id: "s8", ini: 45, fin: 52.6, upd(t) {
+      rise($("s8k"), t, 0.1);
+      rise($("s8h"), t, 0.3);
+      PUNTOS.forEach((_, i) => rise($("s8i" + i), t, 1.1 + i * 0.45, 0.6, 0, `translateX(${(1 - p(t, 1.1 + i * 0.45, 0.6)) * -40}px)`));
+      rise($("s8b"), t, 0.6, 1.0, 120);
+    } },
+  { id: "s9", ini: 52.6, fin: 60, upd(t) {
+      const k = p(t, 0.1, 0.9);
+      $("s9l").style.opacity = k;
+      $("s9l").style.transform = `scale(${0.92 + 0.08 * k})`;
+      rise($("s9t"), t, 0.6);
+      rise($("s9d"), t, 1.1);
+      rise($("s9c"), t, 1.7);
+    } },
+];
+const DURACION = 60;
+const FUNDIDO = 0.6;
+
+window.DURACION = DURACION;
+window.render = function (t) {
+  for (const s of ESCENAS) {
+    const el = $(s.id);
+    // Fundido cruzado: cada cambio de escena se superpone FUNDIDO segundos.
+    const entra = s.ini === 0 ? 1 : clamp((t - s.ini) / FUNDIDO + 0.5);
+    const sale = s.fin >= DURACION ? 1 : clamp((s.fin - t) / FUNDIDO + 0.5);
+    const vis = Math.min(entra, sale);
+    el.style.opacity = vis;
+    el.style.display = vis > 0 ? "block" : "none";
+    if (vis > 0) s.upd(t - s.ini);
+  }
+  // Fundido a negro al final.
+  $("stage").style.opacity = 1 - clamp((t - (DURACION - 0.8)) / 0.8);
+};
+render(0);
+</script>
+</body>
+</html>

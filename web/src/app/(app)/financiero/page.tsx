@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Minus, Plus, Receipt } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { etiqueta, formatoFecha, formatoMoneda } from "@/lib/format";
+import { etiqueta, formatoFecha, formatoMoneda, nombreCategoria } from "@/lib/format";
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, Field, Input, Modal, PageHeader, Select, Skeleton, Tabs, Td, Th, cn } from "@/components/ui";
 
 interface Ingreso {
@@ -33,8 +33,6 @@ interface Caja {
 }
 
 const CATEGORIAS_EGRESO = ["repuestos", "nomina", "alquiler", "servicios_basicos", "herramientas", "impuestos", "marketing", "mantenimiento_local", "otros"];
-const NOMBRE_CATEGORIA: Record<string, string> = { nomina: "Sueldos", servicios_basicos: "Servicios básicos", mantenimiento_local: "Mantenimiento del local" };
-const nombreCategoria = (c: string) => NOMBRE_CATEGORIA[c] ?? etiqueta(c);
 
 const METODOS = (
   <>

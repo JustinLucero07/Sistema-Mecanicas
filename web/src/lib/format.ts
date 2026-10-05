@@ -52,6 +52,13 @@ export function etiqueta(valor: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+const NOMBRE_CATEGORIA: Record<string, string> = { nomina: "Sueldos", servicios_basicos: "Servicios básicos", mantenimiento_local: "Mantenimiento del local" };
+
+/** Nombre para mostrar de una categoría de egreso. */
+export function nombreCategoria(categoria: string): string {
+  return NOMBRE_CATEGORIA[categoria] ?? etiqueta(categoria);
+}
+
 export type Tono = "neutral" | "brand" | "ok" | "warn" | "bad" | "info";
 
 /** Orden real del flujo de una orden de trabajo en el taller. */

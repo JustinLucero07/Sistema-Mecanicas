@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { History } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { etiqueta, formatoFechaHora } from "@/lib/format";
+import { estadoOrden, etiqueta, formatoFechaHora, formatoMoneda } from "@/lib/format";
 import { Alert, Badge, Button, Card, EmptyState, PageHeader, Select, Skeleton } from "@/components/ui";
 
 interface Registro {
@@ -45,13 +45,42 @@ const ACCIONES: Record<string, { verbo: string; tono: "neutral" | "ok" | "info" 
   exportar_datos: { verbo: "Exportó los datos de", tono: "warn" },
 };
 
-function valorLegible(v: unknown): string {
+// Campos que guardan el id de una persona: se muestra su nombre.
+const CAMPOS_PERSONA = new Set(["mecanico_id", "usuario_id", "responsable_id", "recibido_por_id", "creado_por_id"]);
+
+const CAMPOS_DINERO = new Set(["monto", "monto_pagado", "subtotal", "total", "iva", "descuento", "precio_unitario", "precio_venta", "costo_compra", "saldo", "monto_total", "monto_inicial", "monto_final"]);
+
+const CAMPOS: Record<string, string> = {
+  mecanico_id: "Mecánico",
+  usuario_id: "Usuario",
+  cliente_id: "Cliente",
+  vehiculo_id: "Vehículo",
+  sucursal_id: "Sucursal",
+  proveedor_id: "Proveedor",
+  repuesto_id: "Repuesto",
+  monto_pagado: "Monto pagado",
+  password_hash: "Contraseña",
+};
+
+function nombreCampo(campo: string): string {
+  return CAMPOS[campo] ?? etiqueta(campo.replace(/_id$/, ""));
+}
+
+function valorLegible(campo: string, v: unknown, personas: Map<number, string>): string {
   if (v === null || v === undefined || v === "") return "vacío";
   if (typeof v === "boolean") return v ? "sí" : "no";
+  if (campo === "password_hash") return "(cambiada)";
+  if (typeof v === "number" && CAMPOS_PERSONA.has(campo)) return personas.get(v) ?? `#${v}`;
+  if (typeof v === "number" && campo.endsWith("_id")) return `#${v}`;
+  if (CAMPOS_DINERO.has(campo) && !Number.isNaN(Number(v))) return formatoMoneda(Number(v));
+  if (campo === "estado" && typeof v === "string") return estadoOrden(v).label;
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return formatoFechaHora(v);
+  // Valores de listas internas (p. ej. "servicio_externo"): se muestran como texto.
+  if (typeof v === "string" && /^[a-z]+(_[a-z]+)+$/.test(v)) return etiqueta(v);
   return String(v);
 }
 
-function DetalleCambios({ registro }: { registro: Registro }) {
+function DetalleCambios({ registro, personas }: { registro: Registro; personas: Map<number, string> }) {
   if (registro.accion !== "actualizar" || !registro.cambios) return null;
   return (
     <ul className="mt-2 space-y-0.5 text-[0.87rem] text-ink-2">
@@ -59,7 +88,8 @@ function DetalleCambios({ registro }: { registro: Registro }) {
         const { antes, despues } = (valor ?? {}) as { antes?: unknown; despues?: unknown };
         return (
           <li key={campo}>
-            <span className="text-ink-3">{etiqueta(campo)}:</span> {valorLegible(antes)} → <span className="font-semibold text-ink">{valorLegible(despues)}</span>
+            <span className="text-ink-3">{nombreCampo(campo)}:</span> {valorLegible(campo, antes, personas)} →{" "}
+            <span className="font-semibold text-ink">{valorLegible(campo, despues, personas)}</span>
           </li>
         );
       })}
@@ -72,6 +102,14 @@ export default function ActividadPage() {
   const [entidad, setEntidad] = useState("");
   const [hayMas, setHayMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [personas, setPersonas] = useState<Map<number, string>>(new Map());
+
+  useEffect(() => {
+    api
+      .get<{ id: number; nombre: string }[]>("/api/usuarios")
+      .then((us) => setPersonas(new Map(us.map((u) => [u.id, u.nombre]))))
+      .catch(() => {}); // Sin la lista se muestran los ids; no impide ver la actividad.
+  }, []);
 
   const cargar = useCallback(
     async (antesDe?: number) => {
@@ -149,7 +187,7 @@ export default function ActividadPage() {
                     {r.accion === "login_fallido" && typeof r.cambios?.email === "string" && (
                       <p className="text-[0.87rem] text-ink-3">Correo usado: {r.cambios.email}</p>
                     )}
-                    <DetalleCambios registro={r} />
+                    <DetalleCambios registro={r} personas={personas} />
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge tone={accion.tono}>{accion.verbo}</Badge>
